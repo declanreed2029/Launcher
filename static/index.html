@@ -376,27 +376,34 @@
     }
 
     #hud-globe-wrap {
-      top: max(48px, calc(env(safe-area-inset-top) + 36px));
-      right: max(138px, calc(env(safe-area-inset-right) + 120px));
+      top: max(26px, calc(env(safe-area-inset-top) + 18px));
+      right: max(96px, calc(env(safe-area-inset-right) + 84px));
+      width: min(25vw, 196px);
+      height: min(25vw, 196px);
+      overflow: hidden;
       background: var(--hud-bg);
+      position: absolute;
     }
 
     #hud-globe-wrap .hud-anim-media {
-      width: min(26vw, 200px);
-      height: min(26vw, 200px);
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 155%;
+      height: 155%;
       max-width: none;
       max-height: none;
-      object-position: top right;
-      transform: scale(1.18);
-      transform-origin: top right;
-      /* Crush letterbox grays to black, then blend into HUD */
-      filter: contrast(2.1) brightness(0.68) saturate(1.08);
+      /* Crop pure-black letterbox on the left; center the globe */
+      transform: translate(-44%, -54%);
+      object-fit: cover;
+      object-position: 62% 42%;
+      filter: contrast(2.15) brightness(0.7) saturate(1.06);
       mix-blend-mode: screen;
     }
 
     #hud-radar-wrap {
       bottom: max(20px, env(safe-area-inset-bottom));
-      right: max(14px, env(safe-area-inset-right));
+      right: max(46px, calc(env(safe-area-inset-right) + 38px));
       z-index: 13;
       background: var(--hud-bg);
     }
