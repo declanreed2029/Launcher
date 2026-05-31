@@ -1,7 +1,13 @@
 # Assets
 
-Place media files here. The HUD intro expects:
+Media served from `/assets/...`
 
-- `Intro.mp4` — played after the boot sequence
+| File | HUD use |
+|------|---------|
+| `Intro.mp4` | Full-screen intro after boot sequence |
+| `globe.mp4` | Top-right corner, loops on HUD |
+| `radar.mp4` | Bottom-right corner, loops on HUD |
 
-Served at: `http://<pi-ip>/assets/Intro.mp4`
+Use **exact filenames** above, or edit `GLOBE_URL` / `RADAR_URL` in `static/index.html`.
+
+`.webm` also works if you change the URLs in `index.html`.

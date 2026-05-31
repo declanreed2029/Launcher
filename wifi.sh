@@ -23,9 +23,9 @@ sync_to_opt() {
   echo "=== Syncing ${ROOT} -> ${INSTALL_DIR} ==="
   mkdir -p "$INSTALL_DIR"
   rsync -a --exclude '__pycache__' --exclude '.venv' "${ROOT}/" "${INSTALL_DIR}/"
-  if [[ -f "${ROOT}/assets/Intro.mp4" ]]; then
+  if [[ -d "${ROOT}/assets" ]]; then
     mkdir -p "${INSTALL_DIR}/assets"
-    rsync -a "${ROOT}/assets/Intro.mp4" "${INSTALL_DIR}/assets/"
+    rsync -a "${ROOT}/assets/" "${INSTALL_DIR}/assets/"
   fi
   chown -R "${SUDO_USER:-dtcteam2}:${SUDO_USER:-dtcteam2}" "$INSTALL_DIR"
   echo "Sync done."
