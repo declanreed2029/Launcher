@@ -1,0 +1,6 @@
+flask>=3.0
+pigpio>=1.78
+spidev>=3.6
+
+# Optional — only if BATTERY_BACKEND = "ina219" in config.py:
+# pi-ina219>=1.4.1

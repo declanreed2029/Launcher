@@ -1,0 +1,65 @@
+#!/bin/bash
+# Install Python deps, pigpio, and systemd service for Launcher HUD
+# Run on the Pi: sudo bash setup/install.sh
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+INSTALL_DIR="/opt/launcher"
+SERVICE_USER="${SUDO_USER:-pi}"
+
+if [[ $EUID -ne 0 ]]; then
+  echo "Run as root: sudo bash $0"
+  exit 1
+fi
+
+echo "Installing system packages..."
+apt-get update
+apt-get install -y python3 python3-pip python3-venv pigpio rsync
+
+systemctl enable pigpiod
+systemctl start pigpiod
+
+echo "Copying project to ${INSTALL_DIR}..."
+mkdir -p "$INSTALL_DIR"
+rsync -a --exclude '__pycache__' --exclude '.venv' "$PROJECT_DIR/" "$INSTALL_DIR/"
+chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
+
+echo "Creating virtualenv..."
+sudo -u "$SERVICE_USER" python3 -m venv "$INSTALL_DIR/.venv"
+sudo -u "$SERVICE_USER" "$INSTALL_DIR/.venv/bin/pip" install --upgrade pip
+sudo -u "$SERVICE_USER" "$INSTALL_DIR/.venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt"
+
+cat > /etc/systemd/system/launcher.service <<EOF
+[Unit]
+Description=Launcher HUD web server
+After=network.target pigpiod.service hostapd.service
+Wants=pigpiod.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${INSTALL_DIR}
+ExecStart=${INSTALL_DIR}/.venv/bin/python ${INSTALL_DIR}/server.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable launcher.service
+
+echo ""
+echo "Install complete."
+echo ""
+echo "Next steps:"
+echo "  1. Copy Intro.mp4 to ${INSTALL_DIR}/static/Intro.mp4"
+echo "  2. Edit ${INSTALL_DIR}/config.py (GPIO, battery backend)"
+echo "  3. sudo bash ${INSTALL_DIR}/setup/setup_wifi_ap.sh   (if not done yet)"
+echo "  4. sudo reboot"
+echo "  5. Connect to WiFi 'Launcher', open http://192.168.4.1"
+echo ""
+echo "Manual start (test): sudo ${INSTALL_DIR}/.venv/bin/python ${INSTALL_DIR}/server.py"
