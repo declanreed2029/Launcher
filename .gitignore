@@ -4,5 +4,3 @@ __pycache__/
 *.pyo
 .Python
 .env
-assets/*.mp4
-assets/*.MP4
