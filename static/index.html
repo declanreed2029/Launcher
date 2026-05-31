@@ -372,42 +372,46 @@
       border: none;
       outline: none;
       opacity: 1;
-      filter: none;
-      /* Black in video becomes transparent on HUD background */
-      mix-blend-mode: screen;
       object-fit: contain;
     }
 
     #hud-globe-wrap {
       top: max(48px, calc(env(safe-area-inset-top) + 36px));
-      /* Shift left so globe clears the tilt scale on the right */
-      right: max(118px, calc(env(safe-area-inset-right) + 102px));
+      right: max(138px, calc(env(safe-area-inset-right) + 120px));
+      background: var(--hud-bg);
     }
 
     #hud-globe-wrap .hud-anim-media {
-      width: min(24vw, 188px);
-      height: min(24vw, 188px);
+      width: min(26vw, 200px);
+      height: min(26vw, 200px);
       max-width: none;
       max-height: none;
       object-position: top right;
-      transform: scale(1.12);
+      transform: scale(1.18);
       transform-origin: top right;
+      /* Crush letterbox grays to black, then blend into HUD */
+      filter: contrast(2.1) brightness(0.68) saturate(1.08);
+      mix-blend-mode: screen;
     }
 
     #hud-radar-wrap {
       bottom: max(20px, env(safe-area-inset-bottom));
       right: max(14px, env(safe-area-inset-right));
       z-index: 13;
+      background: var(--hud-bg);
     }
 
     #hud-radar-wrap .hud-anim-media {
-      width: min(22vw, 168px);
-      height: min(22vw, 168px);
+      width: min(24vw, 180px);
+      height: min(24vw, 180px);
       max-width: none;
       max-height: none;
       object-position: bottom right;
-      transform: scale(1.08);
+      transform: scale(1.1);
       transform-origin: bottom right;
+      /* WebM with alpha — no screen blend */
+      filter: none;
+      mix-blend-mode: normal;
     }
 
     #hud-right-scale {
@@ -423,14 +427,16 @@
 
     .dpad {
       display: grid;
-      grid-template-columns: 58px 58px 58px;
-      grid-template-rows: 58px 58px 58px;
-      gap: 5px;
+      grid-template-columns: 116px 116px 116px;
+      grid-template-rows: 116px 116px 116px;
+      gap: 8px;
+      justify-items: center;
+      align-items: center;
     }
 
     .arrow-btn {
-      width: 58px;
-      height: 58px;
+      width: 116px;
+      height: 116px;
       padding: 0;
       border: 1px solid rgba(220, 220, 220, 0.35);
       background: rgba(128, 128, 128, 0.5);
@@ -535,6 +541,8 @@
       '/assets/globe.webm', '/assets/Globe.webm'
     ];
     const RADAR_CANDIDATES = [
+      '/assets/RadarGood.webm',
+      '/assets/radargood.webm',
       '/assets/radar.mp4', '/assets/Radar.mp4',
       '/assets/radar.webm', '/assets/Radar.webm'
     ];
