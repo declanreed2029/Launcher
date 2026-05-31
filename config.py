@@ -9,8 +9,11 @@ WIFI_CHANNEL = 6
 WEB_HOST = "0.0.0.0"
 WEB_PORT = 80
 
-# Pan servo signal wire -> BCM GPIO (matches ESP32 default PAN_SERVO_GPIO 18)
-SERVO_GPIO = 18
+# Servo signal wires -> BCM GPIO
+PAN_SERVO_GPIO = 18   # left / right (matches ESP32 PAN_SERVO_GPIO)
+TILT_SERVO_GPIO = 19  # up / down — wire second servo here
+SERVO_GPIO = PAN_SERVO_GPIO  # alias for older configs
+
 SERVO_MIN_PULSE_US = 500
 SERVO_MAX_PULSE_US = 2500
 

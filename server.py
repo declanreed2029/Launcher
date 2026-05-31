@@ -11,7 +11,7 @@ from flask import Flask, jsonify, request, send_from_directory
 
 import battery_monitor
 import config
-import pan_servo
+import servos
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("launcher")
@@ -67,7 +67,8 @@ def _apply_move(move: str) -> None:
         return
 
     _clamp_pan_tilt()
-    pan_servo.set_pan_deg(_pan_deg)
+    servos.set_pan_deg(_pan_deg)
+    servos.set_tilt_deg(_tilt_deg)
 
 
 @app.get("/")
@@ -140,7 +141,7 @@ def cmd():
 
 
 def _shutdown() -> None:
-    pan_servo.cleanup()
+    servos.cleanup()
 
 
 def main() -> None:
@@ -155,7 +156,7 @@ def main() -> None:
         log.info("Intro video: %s", intro)
 
     battery_monitor.init()
-    pan_servo.init()
+    servos.init()
     atexit.register(_shutdown)
 
     log.info("Launcher HUD on http://192.168.4.1:%d", config.WEB_PORT)
