@@ -4,4 +4,5 @@ __pycache__/
 *.pyo
 .Python
 .env
-static/Intro.mp4
+assets/*.mp4
+assets/*.MP4

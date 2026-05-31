@@ -16,8 +16,42 @@ fi
 
 echo "Installing system packages..."
 apt-get update
-apt-get install -y python3 python3-pip python3-venv pigpio rsync
+apt-get install -y python3 python3-pip python3-venv rsync git make
 
+install_pigpio() {
+  if apt-get install -y pigpio 2>/dev/null; then
+    echo "Installed pigpio from apt."
+    return 0
+  fi
+
+  echo "pigpio not in apt — building from source..."
+  build_dir="$(mktemp -d)"
+  git clone --depth 1 https://github.com/joan2937/pigpio.git "$build_dir"
+  make -C "$build_dir"
+  make -C "$build_dir" install
+  rm -rf "$build_dir"
+  ldconfig
+
+  if [[ ! -f /etc/systemd/system/pigpiod.service ]]; then
+    cat > /etc/systemd/system/pigpiod.service <<'EOF'
+[Unit]
+Description=pigpio daemon
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/pigpiod
+ExecStop=/bin/kill -s TERM $MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  fi
+}
+
+install_pigpio
+systemctl daemon-reload
 systemctl enable pigpiod
 systemctl start pigpiod
 
@@ -56,7 +90,7 @@ echo ""
 echo "Install complete."
 echo ""
 echo "Next steps:"
-echo "  1. Copy Intro.mp4 to ${INSTALL_DIR}/static/Intro.mp4"
+echo "  1. Copy Intro.mp4 to ${INSTALL_DIR}/assets/Intro.mp4"
 echo "  2. Edit ${INSTALL_DIR}/config.py (GPIO, battery backend)"
 echo "  3. sudo bash ${INSTALL_DIR}/setup/setup_wifi_ap.sh   (if not done yet)"
 echo "  4. sudo reboot"

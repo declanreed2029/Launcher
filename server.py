@@ -18,6 +18,8 @@ log = logging.getLogger("launcher")
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
+ASSETS_DIR = BASE_DIR / "assets"
+INTRO_VIDEO_NAME = "Intro.mp4"
 
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="")
 
@@ -58,9 +60,15 @@ def index():
     return send_from_directory(STATIC_DIR, "index.html")
 
 
+@app.get("/assets/<path:filename>")
+def assets(filename: str):
+    return send_from_directory(ASSETS_DIR, filename)
+
+
 @app.get("/Intro.mp4")
-def intro_video():
-    return send_from_directory(STATIC_DIR, "Intro.mp4")
+def intro_video_legacy():
+    """Old URL — redirects browsers to assets path."""
+    return send_from_directory(ASSETS_DIR, INTRO_VIDEO_NAME)
 
 
 @app.get("/api/status")
