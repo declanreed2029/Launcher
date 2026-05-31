@@ -357,53 +357,61 @@
 
     #hud-bottom-left .dim { color: var(--hud-dim); }
 
-    /* Corner HUD animations — full frame visible, no circular clip */
+    /* Corner HUD animations — blend into black HUD (no green glow / box) */
     .hud-anim-wrap {
       position: absolute;
       pointer-events: none;
-      z-index: 7;
+      z-index: 12;
       overflow: visible;
+      background: transparent;
     }
 
     .hud-anim-media {
       display: block;
-      width: auto;
-      height: auto;
-      max-width: min(22vw, 168px);
-      max-height: min(22vw, 168px);
+      background: transparent;
+      border: none;
+      outline: none;
+      opacity: 1;
+      filter: none;
+      /* Black in video becomes transparent on HUD background */
+      mix-blend-mode: screen;
       object-fit: contain;
-      object-position: center;
-      opacity: 0.92;
-      filter: drop-shadow(0 0 8px rgba(0, 255, 136, 0.25));
     }
 
     #hud-globe-wrap {
-      top: max(52px, calc(env(safe-area-inset-top) + 40px));
-      right: max(10px, env(safe-area-inset-right));
+      top: max(48px, calc(env(safe-area-inset-top) + 36px));
+      /* Shift left so globe clears the tilt scale on the right */
+      right: max(118px, calc(env(safe-area-inset-right) + 102px));
     }
 
     #hud-globe-wrap .hud-anim-media {
-      max-width: min(26vw, 200px);
-      max-height: min(26vw, 200px);
+      width: min(24vw, 188px);
+      height: min(24vw, 188px);
+      max-width: none;
+      max-height: none;
       object-position: top right;
+      transform: scale(1.12);
+      transform-origin: top right;
     }
 
     #hud-radar-wrap {
-      bottom: max(22px, env(safe-area-inset-bottom));
-      right: max(10px, env(safe-area-inset-right));
+      bottom: max(20px, env(safe-area-inset-bottom));
+      right: max(14px, env(safe-area-inset-right));
+      z-index: 13;
     }
 
     #hud-radar-wrap .hud-anim-media {
-      max-width: min(20vw, 152px);
-      max-height: min(20vw, 152px);
+      width: min(22vw, 168px);
+      height: min(22vw, 168px);
+      max-width: none;
+      max-height: none;
       object-position: bottom right;
+      transform: scale(1.08);
+      transform-origin: bottom right;
     }
 
-    /* Keep tilt scale clear of corner animations on wider screens */
-    @media (min-width: 520px) {
-      #hud-right-scale {
-        right: max(108px, calc(env(safe-area-inset-right) + 92px));
-      }
+    #hud-right-scale {
+      right: max(64px, env(safe-area-inset-right));
     }
 
     #control-center {
@@ -499,14 +507,14 @@
         <div class="dim" id="sig-label">Sig Str: 100%</div>
       </div>
 
-      <div id="hud-globe-wrap" class="hud-anim-wrap" aria-hidden="true">
-        <video id="hud-globe" class="hud-anim-media" autoplay muted loop playsinline preload="auto"></video>
-      </div>
+    </div>
 
-      <div id="hud-radar-wrap" class="hud-anim-wrap" aria-hidden="true">
-        <video id="hud-radar" class="hud-anim-media" autoplay muted loop playsinline preload="auto"></video>
-      </div>
+    <div id="hud-globe-wrap" class="hud-anim-wrap" aria-hidden="true">
+      <video id="hud-globe" class="hud-anim-media" autoplay muted loop playsinline preload="auto"></video>
+    </div>
 
+    <div id="hud-radar-wrap" class="hud-anim-wrap" aria-hidden="true">
+      <video id="hud-radar" class="hud-anim-media" autoplay muted loop playsinline preload="auto"></video>
     </div>
 
     <div id="control-center">
@@ -522,8 +530,14 @@
   <script>
     const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*';
     const INTRO_VIDEO_URL = '/assets/Intro.mp4';
-    const GLOBE_URL = '/assets/globe.mp4';
-    const RADAR_URL = '/assets/radar.mp4';
+    const GLOBE_CANDIDATES = [
+      '/assets/globe.mp4', '/assets/Globe.mp4',
+      '/assets/globe.webm', '/assets/Globe.webm'
+    ];
+    const RADAR_CANDIDATES = [
+      '/assets/radar.mp4', '/assets/Radar.mp4',
+      '/assets/radar.webm', '/assets/Radar.webm'
+    ];
     const BOOT_MESSAGES = [
       { text: 'CONNECTING TO SATELLITE', reveal: 1500, hold: 800, fade: 400 },
       { text: 'SATELLITE UPLINK ESTABLISHED', reveal: 1800, hold: 800, fade: 400 },
@@ -929,34 +943,59 @@
       startHudAnims();
     }
 
-    function setupHudAnimVideo(video, url) {
-      if (!video || !url) return;
-      if (video.getAttribute('src') !== url) {
-        video.setAttribute('src', url);
-        video.load();
-      }
+    function resolveAssetUrl(candidates) {
+      return new Promise(function(resolve) {
+        var i = 0;
+        function tryNext() {
+          if (i >= candidates.length) {
+            resolve(null);
+            return;
+          }
+          var url = candidates[i++];
+          fetch(url, { method: 'HEAD' })
+            .then(function(r) {
+              if (r.ok) resolve(url);
+              else tryNext();
+            })
+            .catch(tryNext);
+        }
+        tryNext();
+      });
+    }
+
+    function setupHudAnimVideo(video, candidates) {
+      if (!video || !candidates || !candidates.length) return;
+      resolveAssetUrl(candidates).then(function(url) {
+        if (!url) {
+          console.warn('HUD asset not found:', candidates[0]);
+          video.style.visibility = 'hidden';
+          return;
+        }
+        video.style.visibility = 'visible';
+        if (video.getAttribute('src') !== url) {
+          video.setAttribute('src', url);
+          video.load();
+        }
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.play().catch(function(err) {
+          console.warn('HUD animation play failed:', url, err);
+        });
+      });
     }
 
     function startHudAnims() {
-      setupHudAnimVideo(document.getElementById('hud-globe'), GLOBE_URL);
-      setupHudAnimVideo(document.getElementById('hud-radar'), RADAR_URL);
-
-      document.querySelectorAll('.hud-anim-media').forEach(function(video) {
-        if (!video.getAttribute('src')) return;
-        video.muted = true;
-        video.loop = true;
-        video.play().catch(function(err) {
-          console.warn('HUD animation play failed:', err);
-        });
-      });
+      setupHudAnimVideo(document.getElementById('hud-globe'), GLOBE_CANDIDATES);
+      setupHudAnimVideo(document.getElementById('hud-radar'), RADAR_CANDIDATES);
     }
 
     window.onload = function() {
       hideControlPanel();
       document.getElementById('intro-screen').style.display = 'none';
       preloadIntroVideo();
-      setupHudAnimVideo(document.getElementById('hud-globe'), GLOBE_URL);
-      setupHudAnimVideo(document.getElementById('hud-radar'), RADAR_URL);
+      setupHudAnimVideo(document.getElementById('hud-globe'), GLOBE_CANDIDATES);
+      setupHudAnimVideo(document.getElementById('hud-radar'), RADAR_CANDIDATES);
       startSignalIconAnimation();
       bindHoldControls();
       runBootSequence();

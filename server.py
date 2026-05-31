@@ -75,12 +75,28 @@ def index():
     return send_from_directory(STATIC_DIR, "index.html")
 
 
+def _resolve_asset_file(filename: str) -> Path | None:
+    """Match asset filename case-insensitively (Linux paths are case-sensitive)."""
+    if not ASSETS_DIR.is_dir():
+        return None
+    target = filename.lower()
+    for path in ASSETS_DIR.iterdir():
+        if path.is_file() and path.name.lower() == target:
+            return path
+    return None
+
+
 @app.get("/assets/<path:filename>")
 def assets(filename: str):
     if filename == INTRO_VIDEO_NAME:
         intro_dir = _intro_video_dir()
         if (intro_dir / INTRO_VIDEO_NAME).is_file():
             return send_from_directory(intro_dir, INTRO_VIDEO_NAME)
+
+    resolved = _resolve_asset_file(filename)
+    if resolved is not None:
+        return send_from_directory(resolved.parent, resolved.name)
+
     return send_from_directory(ASSETS_DIR, filename)
 
 
