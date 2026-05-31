@@ -1,11 +1,9 @@
 #!/bin/bash
-# Configure Raspberry Pi as WiFi access point "Launcher" / "Launcher"
-# Run on the Pi: sudo bash setup/setup_wifi_ap.sh
+# One-time: install hostapd/dnsmasq config only (does NOT enable AP on boot).
+# Run: sudo bash setup/setup_wifi_ap.sh
+# Then: sudo bash wifi.sh on
 
 set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 SSID="Launcher"
 PASS="Launcher"
@@ -22,7 +20,12 @@ apt-get install -y hostapd dnsmasq
 
 systemctl stop hostapd 2>/dev/null || true
 systemctl stop dnsmasq 2>/dev/null || true
+systemctl disable hostapd 2>/dev/null || true
+systemctl disable dnsmasq 2>/dev/null || true
 systemctl unmask hostapd 2>/dev/null || true
+
+mkdir -p /etc/hostapd /etc/launcher
+rm -f /etc/launcher/ap-on-boot
 
 cat > /etc/hostapd/hostapd.conf <<EOF
 interface=wlan0
@@ -30,6 +33,7 @@ driver=nl80211
 ssid=${SSID}
 hw_mode=g
 channel=${CHANNEL}
+country_code=US
 wmm_enabled=0
 macaddr_acl=0
 auth_algs=1
@@ -41,38 +45,20 @@ wpa_pairwise=TKIP CCMP
 rsn_pairwise=CCMP
 EOF
 
+if [[ -f /etc/default/hostapd ]]; then
+  sed -i 's|^#*DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
+fi
+
 cat > /etc/dnsmasq.conf <<EOF
 interface=wlan0
+bind-interfaces
 dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
 domain=local
 address=/launcher.local/192.168.4.1
 EOF
 
-# Static IP for AP mode on wlan0
-if ! grep -q "# launcher-ap" /etc/dhcpcd.conf 2>/dev/null; then
-  cat >> /etc/dhcpcd.conf <<'EOF'
-
-# launcher-ap
-interface wlan0
-    static ip_address=192.168.4.1/24
-    nohook wpa_supplicant
-EOF
-fi
-
-if [[ -f /etc/wpa_supplicant/wpa_supplicant.conf ]]; then
-  if ! grep -q "launcher-ap-disable" /etc/wpa_supplicant/wpa_supplicant.conf; then
-    echo "# launcher-ap-disable - hostapd owns wlan0" >> /etc/wpa_supplicant/wpa_supplicant.conf
-  fi
-fi
-
-systemctl enable hostapd
-systemctl enable dnsmasq
-
 echo ""
-echo "WiFi AP configured:"
-echo "  SSID:     ${SSID}"
-echo "  Password: ${PASS}"
-echo "  Pi IP:    192.168.4.1"
+echo "Config installed. AP is disabled on boot (safe for Pi Connect)."
 echo ""
-echo "Reboot to apply: sudo reboot"
-echo "After reboot, connect to WiFi and open http://192.168.4.1"
+echo "Start Launcher WiFi now:  sudo bash wifi.sh on"
+echo "Never use auto-boot AP unless you want: sudo bash wifi.sh on --boot"

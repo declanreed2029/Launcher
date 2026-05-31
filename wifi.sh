@@ -1,21 +1,25 @@
 #!/bin/bash
-# Launcher — one command to turn WiFi AP + HUD on or off.
+# Launcher — WiFi AP + HUD control
 #
-#   sudo bash wifi.sh on       # stop old WiFi, start Launcher AP + web server
-#   sudo bash wifi.sh off      # stop AP, allow normal WiFi again
-#   sudo bash wifi.sh status   # show what is running
-#   sudo bash wifi.sh sync     # copy this folder -> /opt/launcher, then on
+#   sudo bash wifi.sh on          # Start Launcher AP now (stops after reboot)
+#   sudo bash wifi.sh on --boot   # Start AP now AND after every reboot
+#   sudo bash wifi.sh off         # Stop AP, disable auto-start, use hotspot again
+#   sudo bash wifi.sh status      # What is running
+#   sudo bash wifi.sh sync        # Copy project -> /opt/launcher
 #
-# Run from: ~/projects/Launcher   (or anywhere you cloned the repo)
+# Typical use:
+#   Demo day:     sudo bash wifi.sh on
+#   Dev / Connect: sudo bash wifi.sh off
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="/opt/launcher"
-CMD="${1:-on}"
+CMD="${1:-}"
+FLAG="${2:-}"
 
 if [[ $EUID -ne 0 ]]; then
-  echo "Run with sudo: sudo bash wifi.sh $CMD"
+  echo "Run with sudo: sudo bash wifi.sh <command>"
   exit 1
 fi
 
@@ -66,11 +70,15 @@ EOF
 }
 
 stack_on() {
-  sed -i 's/\r$//' "${ROOT}/setup/wifi_stack_on.sh" "${ROOT}/setup/wifi_stack_off.sh" 2>/dev/null || true
+  sed -i 's/\r$//' "${ROOT}/setup/wifi_stack"*.sh 2>/dev/null || true
   sync_to_opt
   ensure_venv
   ensure_launcher_service
-  bash "${ROOT}/setup/wifi_stack_on.sh"
+  if [[ "$FLAG" == "--boot" ]]; then
+    bash "${ROOT}/setup/wifi_stack_on.sh" --boot
+  else
+    bash "${ROOT}/setup/wifi_stack_on.sh"
+  fi
 }
 
 stack_off() {
@@ -79,16 +87,23 @@ stack_off() {
 }
 
 stack_status() {
-  bash "${ROOT}/setup/wifi_stack.sh" status
-  echo ""
-  systemctl is-active launcher 2>/dev/null && echo "launcher service: active" || echo "launcher service: inactive"
+  echo "=== Launcher WiFi status ==="
+  if [[ -f /etc/launcher/ap-on-boot ]]; then
+    echo "Boot:     AP will auto-start on reboot"
+  else
+    echo "Boot:     AP will NOT auto-start (good for Pi Connect)"
+  fi
+  systemctl is-active hostapd 2>/dev/null && echo "hostapd:  active" || echo "hostapd:  inactive"
+  systemctl is-active dnsmasq 2>/dev/null && echo "dnsmasq:  active" || echo "dnsmasq:  inactive"
+  systemctl is-active launcher 2>/dev/null && echo "launcher: active" || echo "launcher: inactive"
+  ip -4 addr show wlan0 2>/dev/null | grep -oP 'inet \K[0-9.]+' | head -1 | xargs -I{} echo "wlan0 IP: {}" || true
 }
 
 case "$CMD" in
   on|start|up)
     stack_on
     ;;
-  off|stop|down)
+  off|stop|down|client|hotspot)
     stack_off
     ;;
   sync)
@@ -101,7 +116,12 @@ case "$CMD" in
     stack_status
     ;;
   *)
-    echo "Usage: sudo bash wifi.sh {on|off|status|sync}"
+    echo "Usage:"
+    echo "  sudo bash wifi.sh on           # Launcher AP now only"
+    echo "  sudo bash wifi.sh on --boot    # Launcher AP now + every reboot"
+    echo "  sudo bash wifi.sh off          # Stop AP, use personal hotspot"
+    echo "  sudo bash wifi.sh status"
+    echo "  sudo bash wifi.sh sync"
     exit 1
     ;;
 esac
