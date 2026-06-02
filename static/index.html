@@ -401,6 +401,105 @@
       mix-blend-mode: screen;
     }
 
+    #hud-launch-cluster {
+      position: absolute;
+      bottom: max(20px, env(safe-area-inset-bottom));
+      right: max(240px, calc(env(safe-area-inset-right) + 228px));
+      width: min(24vw, 180px);
+      height: min(24vw, 180px);
+      z-index: 14;
+      pointer-events: auto;
+    }
+
+    #launch-fire-btn {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid var(--hud-green);
+      background: radial-gradient(circle at 35% 30%, rgba(0, 255, 136, 0.35), rgba(0, 40, 24, 0.85) 55%, rgba(2, 4, 3, 0.95));
+      color: var(--hud-green);
+      font-family: inherit;
+      font-size: clamp(14px, 2.2vw, 18px);
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow:
+        0 0 18px rgba(0, 255, 136, 0.45),
+        0 0 36px rgba(0, 255, 136, 0.2),
+        inset 0 0 24px rgba(0, 255, 136, 0.12);
+      transition: box-shadow 0.2s, transform 0.15s, opacity 0.2s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #launch-fire-btn.armed {
+      box-shadow:
+        0 0 24px rgba(0, 255, 136, 0.75),
+        0 0 48px rgba(0, 255, 136, 0.35),
+        inset 0 0 28px rgba(0, 255, 136, 0.2);
+    }
+
+    #launch-fire-btn.countdown {
+      font-size: clamp(36px, 8vw, 56px);
+      letter-spacing: 0;
+      animation: launchPulse 0.9s ease-in-out infinite;
+    }
+
+    @keyframes launchPulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.5), inset 0 0 20px rgba(0, 255, 136, 0.15); }
+      50% { box-shadow: 0 0 32px rgba(0, 255, 136, 0.9), inset 0 0 32px rgba(0, 255, 136, 0.28); }
+    }
+
+    #launch-fire-btn:disabled,
+    #launch-fire-btn.disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    #launch-fire-btn.shake {
+      animation: launchShake 0.35s ease;
+    }
+
+    @keyframes launchShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+
+    #launch-lock-btn {
+      position: absolute;
+      top: -6px;
+      left: -6px;
+      z-index: 2;
+      width: min(10vw, 72px);
+      height: min(10vw, 72px);
+      border-radius: 50%;
+      border: 1px solid var(--hud-dim);
+      background: rgba(2, 8, 5, 0.92);
+      color: var(--hud-green);
+      font-family: inherit;
+      font-size: clamp(10px, 1.8vw, 12px);
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.25);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #launch-lock-btn.cooldown {
+      font-size: clamp(16px, 3.5vw, 22px);
+      letter-spacing: 0;
+    }
+
+    #launch-lock-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     #hud-radar-wrap {
       bottom: max(20px, env(safe-area-inset-bottom));
       right: max(46px, calc(env(safe-area-inset-right) + 38px));
@@ -524,6 +623,13 @@
 
     <div id="hud-globe-wrap" class="hud-anim-wrap" aria-hidden="true">
       <video id="hud-globe" class="hud-anim-media" autoplay muted loop playsinline preload="auto"></video>
+    </div>
+
+    <div id="hud-launch-cluster" aria-label="Launch controls">
+      <button type="button" id="launch-lock-btn" aria-label="Lock">LOCK</button>
+      <button type="button" id="launch-fire-btn" aria-label="Launch">
+        <span id="launch-fire-label">LAUNCH</span>
+      </button>
     </div>
 
     <div id="hud-radar-wrap" class="hud-anim-wrap" aria-hidden="true">
@@ -693,6 +799,53 @@
       }
     }
 
+    function updateLaunchUi(data) {
+      const lockBtn = document.getElementById('launch-lock-btn');
+      const fireBtn = document.getElementById('launch-fire-btn');
+      const fireLabel = document.getElementById('launch-fire-label');
+      if (!lockBtn || !fireBtn || !fireLabel) return;
+
+      const phase = data.launch_phase || 'idle';
+      const countdown = data.countdown_seconds_left || 0;
+      const cooldown = data.cooldown_seconds_left || 0;
+      const armed = !!data.armed;
+
+      lockBtn.classList.remove('cooldown');
+      fireBtn.classList.remove('armed', 'countdown', 'disabled');
+
+      if (phase === 'cooldown' && cooldown > 0) {
+        lockBtn.textContent = String(cooldown);
+        lockBtn.classList.add('cooldown');
+        lockBtn.disabled = false;
+      } else {
+        lockBtn.textContent = 'LOCK';
+        lockBtn.disabled = phase === 'countdown' || phase === 'firing';
+      }
+
+      if (phase === 'countdown' && countdown > 0) {
+        fireLabel.textContent = String(countdown);
+        fireBtn.classList.add('countdown', 'disabled');
+        fireBtn.disabled = true;
+      } else if (phase === 'firing') {
+        fireLabel.textContent = '…';
+        fireBtn.classList.add('disabled');
+        fireBtn.disabled = true;
+      } else {
+        fireLabel.textContent = 'LAUNCH';
+        fireBtn.disabled = false;
+        if (armed) fireBtn.classList.add('armed');
+      }
+    }
+
+    function shakeLaunchButton() {
+      const fireBtn = document.getElementById('launch-fire-btn');
+      if (!fireBtn) return;
+      fireBtn.classList.remove('shake');
+      void fireBtn.offsetWidth;
+      fireBtn.classList.add('shake');
+      setTimeout(function() { fireBtn.classList.remove('shake'); }, 400);
+    }
+
     function pollStatus() {
       fetch('/api/status')
         .then(function(r) { return r.json(); })
@@ -705,8 +858,33 @@
           }
           updateHudScales();
           updateBatteryLabel(data.battery_percent);
+          updateLaunchUi(data);
         })
         .catch(function() {});
+    }
+
+    function bindLaunchControls() {
+      const lockBtn = document.getElementById('launch-lock-btn');
+      const fireBtn = document.getElementById('launch-fire-btn');
+      if (!lockBtn || !fireBtn) return;
+
+      lockBtn.addEventListener('click', function() {
+        fetch('/api/lock')
+          .then(function(r) { return r.json(); })
+          .then(function(data) { updateLaunchUi(data); })
+          .catch(function() {});
+      });
+
+      fireBtn.addEventListener('click', function() {
+        if (fireBtn.disabled) return;
+        fetch('/api/launch')
+          .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+          .then(function(res) {
+            updateLaunchUi(res.data);
+            if (!res.ok) shakeLaunchButton();
+          })
+          .catch(function() {});
+      });
     }
 
     function startStatusPolling() {
@@ -1013,6 +1191,7 @@
       setupHudAnimVideo(document.getElementById('hud-radar'), RADAR_CANDIDATES);
       startSignalIconAnimation();
       bindHoldControls();
+      bindLaunchControls();
       runBootSequence();
     };
 

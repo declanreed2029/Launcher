@@ -12,7 +12,16 @@ WEB_PORT = 80
 # Servo signal wires -> BCM GPIO
 PAN_SERVO_GPIO = 18   # left / right (matches ESP32 PAN_SERVO_GPIO)
 TILT_SERVO_GPIO = 19  # up / down — wire second servo here
+LAUNCH_SERVO_GPIO = 20  # launch mechanism — third servo
 SERVO_GPIO = PAN_SERVO_GPIO  # alias for older configs
+
+# Launch sequence (Lock → 3s countdown → 90° hold → rest → cooldown display)
+LAUNCH_ARM_SEC = 10
+LAUNCH_COUNTDOWN_SEC = 3
+LAUNCH_HOLD_SEC = 10
+LAUNCH_COOLDOWN_SEC = 30
+LAUNCH_REST_DEG = 0
+LAUNCH_FIRE_DEG = 90
 
 SERVO_MIN_PULSE_US = 500
 SERVO_MAX_PULSE_US = 2500

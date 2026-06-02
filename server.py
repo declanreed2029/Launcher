@@ -11,6 +11,7 @@ from flask import Flask, jsonify, request, send_from_directory
 
 import battery_monitor
 import config
+import launch_controller
 import servos
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -124,7 +125,25 @@ def api_status():
         payload["battery_percent"] = None
         payload["battery_voltage_mv"] = None
 
+    payload.update(launch_controller.status_dict())
     return jsonify(payload)
+
+
+@app.get("/api/lock")
+def api_lock():
+    result = launch_controller.arm()
+    status = 200 if result.get("ok") else 409
+    return jsonify(result), status
+
+
+@app.get("/api/launch")
+def api_launch():
+    result = launch_controller.try_launch()
+    if result.get("ok"):
+        return jsonify(result), 200
+    error = result.get("error", "unknown")
+    status = 409 if error == "busy" else 403
+    return jsonify(result), status
 
 
 @app.get("/cmd")
@@ -141,6 +160,7 @@ def cmd():
 
 
 def _shutdown() -> None:
+    launch_controller.reset()
     servos.cleanup()
 
 

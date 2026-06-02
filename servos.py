@@ -42,14 +42,17 @@ def init() -> None:
 
         pi.set_mode(config.PAN_SERVO_GPIO, pigpio.OUTPUT)
         pi.set_mode(config.TILT_SERVO_GPIO, pigpio.OUTPUT)
+        pi.set_mode(config.LAUNCH_SERVO_GPIO, pigpio.OUTPUT)
         _pi = pi
         _ready = True
         set_pan_deg(0)
         set_tilt_deg(90)
+        set_launch_deg(config.LAUNCH_REST_DEG)
         log.info(
-            "Servos ready — pan GPIO%d, tilt GPIO%d",
+            "Servos ready — pan GPIO%d, tilt GPIO%d, launch GPIO%d",
             config.PAN_SERVO_GPIO,
             config.TILT_SERVO_GPIO,
+            config.LAUNCH_SERVO_GPIO,
         )
     except ImportError:
         log.warning("pigpio not installed — servos disabled")
@@ -77,6 +80,16 @@ def set_tilt_deg(tilt_deg: int) -> None:
     log.debug("tilt=%d -> %d deg (%d us)", tilt_deg, servo_angle, pulse_us)
 
 
+def set_launch_deg(angle_deg: int) -> None:
+    if not _ready or _pi is None:
+        return
+
+    angle_deg = max(0, min(180, angle_deg))
+    pulse_us = angle_to_pulse_us(angle_deg)
+    _pi.set_servo_pulsewidth(config.LAUNCH_SERVO_GPIO, pulse_us)
+    log.info("launch servo -> %d deg (%d us)", angle_deg, pulse_us)
+
+
 def cleanup() -> None:
     global _pi, _ready
 
@@ -84,6 +97,7 @@ def cleanup() -> None:
         try:
             _pi.set_servo_pulsewidth(config.PAN_SERVO_GPIO, 0)
             _pi.set_servo_pulsewidth(config.TILT_SERVO_GPIO, 0)
+            _pi.set_servo_pulsewidth(config.LAUNCH_SERVO_GPIO, 0)
             _pi.stop()
         except Exception:
             pass
