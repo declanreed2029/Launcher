@@ -404,7 +404,7 @@
     #hud-launch-cluster {
       position: absolute;
       bottom: max(20px, env(safe-area-inset-bottom));
-      right: max(240px, calc(env(safe-area-inset-right) + 228px));
+      right: max(240px, calc(env(safe-area-inset-right) + 228px + 5vw));
       width: min(24vw, 180px);
       height: min(24vw, 180px);
       z-index: 14;
@@ -416,7 +416,7 @@
       inset: 0;
       border-radius: 50%;
       border: 2px solid var(--hud-green);
-      background: radial-gradient(circle at 35% 30%, rgba(0, 255, 136, 0.35), rgba(0, 40, 24, 0.85) 55%, rgba(2, 4, 3, 0.95));
+      background: #000;
       color: var(--hud-green);
       font-family: inherit;
       font-size: clamp(14px, 2.2vw, 18px);
@@ -424,31 +424,24 @@
       letter-spacing: 2px;
       text-transform: uppercase;
       cursor: pointer;
-      box-shadow:
-        0 0 18px rgba(0, 255, 136, 0.45),
-        0 0 36px rgba(0, 255, 136, 0.2),
-        inset 0 0 24px rgba(0, 255, 136, 0.12);
-      transition: box-shadow 0.2s, transform 0.15s, opacity 0.2s;
+      box-shadow: none;
+      transition: opacity 0.2s, border-color 0.2s;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
 
     #launch-fire-btn.armed {
-      box-shadow:
-        0 0 24px rgba(0, 255, 136, 0.75),
-        0 0 48px rgba(0, 255, 136, 0.35),
-        inset 0 0 28px rgba(0, 255, 136, 0.2);
+      border-width: 3px;
     }
 
     #launch-fire-btn.countdown {
       font-size: clamp(36px, 8vw, 56px);
       letter-spacing: 0;
-      animation: launchPulse 0.9s ease-in-out infinite;
     }
 
-    @keyframes launchPulse {
-      0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.5), inset 0 0 20px rgba(0, 255, 136, 0.15); }
-      50% { box-shadow: 0 0 32px rgba(0, 255, 136, 0.9), inset 0 0 32px rgba(0, 255, 136, 0.28); }
+    #launch-fire-btn.firing {
+      font-size: clamp(11px, 1.8vw, 14px);
+      letter-spacing: 1px;
     }
 
     #launch-fire-btn:disabled,
@@ -470,14 +463,14 @@
 
     #launch-lock-btn {
       position: absolute;
-      top: -6px;
-      left: -6px;
+      top: -20px;
+      left: -22px;
       z-index: 2;
       width: min(10vw, 72px);
       height: min(10vw, 72px);
       border-radius: 50%;
-      border: 1px solid var(--hud-dim);
-      background: rgba(2, 8, 5, 0.92);
+      border: 1px solid var(--hud-green);
+      background: #000;
       color: var(--hud-green);
       font-family: inherit;
       font-size: clamp(10px, 1.8vw, 12px);
@@ -485,7 +478,7 @@
       letter-spacing: 1px;
       text-transform: uppercase;
       cursor: pointer;
-      box-shadow: 0 0 10px rgba(0, 255, 136, 0.25);
+      box-shadow: none;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
@@ -811,7 +804,7 @@
       const armed = !!data.armed;
 
       lockBtn.classList.remove('cooldown');
-      fireBtn.classList.remove('armed', 'countdown', 'disabled');
+      fireBtn.classList.remove('armed', 'countdown', 'firing', 'disabled');
 
       if (phase === 'cooldown' && cooldown > 0) {
         lockBtn.textContent = String(cooldown);
@@ -827,8 +820,8 @@
         fireBtn.classList.add('countdown', 'disabled');
         fireBtn.disabled = true;
       } else if (phase === 'firing') {
-        fireLabel.textContent = '…';
-        fireBtn.classList.add('disabled');
+        fireLabel.textContent = 'LAUNCHING';
+        fireBtn.classList.add('firing', 'disabled');
         fireBtn.disabled = true;
       } else {
         fireLabel.textContent = 'LAUNCH';
