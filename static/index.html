@@ -377,7 +377,7 @@
 
     #hud-globe-wrap {
       top: max(26px, calc(env(safe-area-inset-top) + 18px));
-      right: max(96px, calc(env(safe-area-inset-right) + 84px));
+      right: max(96px, calc(env(safe-area-inset-right) + 84px + 2vw));
       width: min(25vw, 196px);
       height: min(25vw, 196px);
       overflow: hidden;
@@ -389,14 +389,14 @@
       position: absolute;
       top: 50%;
       left: 50%;
-      width: 118%;
-      height: 118%;
+      width: 112%;
+      height: 112%;
       max-width: none;
       max-height: none;
       /* Light crop hides left letterbox without over-zooming */
-      transform: translate(-46%, -52%);
+      transform: translate(-48%, -52%);
       object-fit: cover;
-      object-position: 56% 48%;
+      object-position: 54% 48%;
       filter: contrast(2.05) brightness(0.74) saturate(1.05);
       mix-blend-mode: screen;
     }
