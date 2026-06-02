@@ -65,7 +65,6 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
-    systemctl enable launcher
   fi
 }
 
@@ -95,6 +94,7 @@ stack_status() {
   fi
   systemctl is-active hostapd 2>/dev/null && echo "hostapd:  active" || echo "hostapd:  inactive"
   systemctl is-active dnsmasq 2>/dev/null && echo "dnsmasq:  active" || echo "dnsmasq:  inactive"
+  systemctl is-active pigpiod 2>/dev/null && echo "pigpiod:  active" || echo "pigpiod:  inactive"
   systemctl is-active launcher 2>/dev/null && echo "launcher: active" || echo "launcher: inactive"
   ip -4 addr show wlan0 2>/dev/null | grep -oP 'inet \K[0-9.]+' | head -1 | xargs -I{} echo "wlan0 IP: {}" || true
 }

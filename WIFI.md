@@ -38,6 +38,8 @@ sudo bash wifi.sh on
 
 Phone joins **Launcher** / password **Launcher** → http://192.168.4.1
 
+This also starts **pigpiod** and the **launcher** HUD (pan/tilt servos). They stop when you run `wifi.sh off`.
+
 **By default, AP turns off after reboot** so you are not stuck without Connect.
 
 ---
@@ -46,9 +48,9 @@ Phone joins **Launcher** / password **Launcher** → http://192.168.4.1
 
 | Command | Effect |
 |---------|--------|
-| `sudo bash wifi.sh on` | AP on now, **off after reboot** |
-| `sudo bash wifi.sh on --boot` | AP on now **and every reboot** |
-| `sudo bash wifi.sh off` | AP off, **no auto-start**, normal WiFi |
+| `sudo bash wifi.sh on` | AP + servos on now, **off after reboot** |
+| `sudo bash wifi.sh on --boot` | AP + servos on now **and every reboot** |
+| `sudo bash wifi.sh off` | AP + servos off, **no auto-start**, normal WiFi |
 | `sudo bash wifi.sh status` | Check AP / boot setting |
 
 ---

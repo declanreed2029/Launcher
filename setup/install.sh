@@ -84,7 +84,7 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable launcher.service
+systemctl disable launcher.service 2>/dev/null || true
 
 echo ""
 echo "Install complete."
@@ -93,7 +93,7 @@ echo "Next steps:"
 echo "  1. Copy Intro.mp4 to ${INSTALL_DIR}/assets/Intro.mp4"
 echo "  2. Edit ${INSTALL_DIR}/config.py (GPIO, battery backend)"
 echo "  3. sudo bash ${INSTALL_DIR}/setup/setup_wifi_ap.sh   (if not done yet)"
-echo "  4. sudo reboot"
+echo "  4. sudo bash ${INSTALL_DIR}/wifi.sh on   (starts AP + servo HUD)"
 echo "  5. Connect to WiFi 'Launcher', open http://192.168.4.1"
 echo ""
 echo "Manual start (test): sudo ${INSTALL_DIR}/.venv/bin/python ${INSTALL_DIR}/server.py"

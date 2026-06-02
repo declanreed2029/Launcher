@@ -13,6 +13,11 @@ WLAN="${WLAN_INTERFACE:-wlan0}"
 
 echo "=== Stopping Launcher WiFi stack ==="
 
+echo "Stopping servo stack (launcher HUD + pigpiod)..."
+systemctl stop launcher 2>/dev/null || true
+systemctl stop pigpiod 2>/dev/null || true
+systemctl disable launcher pigpiod 2>/dev/null || true
+
 systemctl stop hostapd 2>/dev/null || true
 systemctl stop dnsmasq 2>/dev/null || true
 systemctl disable hostapd 2>/dev/null || true

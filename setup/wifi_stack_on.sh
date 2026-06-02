@@ -111,10 +111,25 @@ if ! systemctl is-active --quiet hostapd; then
   exit 1
 fi
 
-systemctl enable pigpiod 2>/dev/null || true
+echo "Starting servo stack (pigpiod + launcher HUD)..."
 systemctl start pigpiod 2>/dev/null || true
-systemctl enable launcher 2>/dev/null || true
-systemctl start launcher 2>/dev/null || true
+for _ in $(seq 1 20); do
+  systemctl is-active --quiet pigpiod && break
+  sleep 0.25
+done
+if ! systemctl is-active --quiet pigpiod; then
+  echo "WARNING: pigpiod did not start — servos will not move until it is running."
+fi
+
+systemctl restart launcher 2>/dev/null || systemctl start launcher 2>/dev/null || true
+
+if [[ "$ENABLE_BOOT" -eq 1 ]]; then
+  systemctl enable pigpiod launcher 2>/dev/null || true
+  echo "Servo stack will start automatically on every boot (with AP --boot)."
+else
+  systemctl disable pigpiod launcher 2>/dev/null || true
+  echo "Servo stack will stop when you run: sudo bash wifi.sh off"
+fi
 
 echo ""
 echo "============================================"
@@ -127,6 +142,7 @@ echo "============================================"
 echo ""
 systemctl is-active --quiet hostapd && echo "  hostapd:  running" || echo "  hostapd:  FAILED"
 systemctl is-active --quiet dnsmasq && echo "  dnsmasq:  running" || echo "  dnsmasq:  FAILED"
+systemctl is-active --quiet pigpiod 2>/dev/null && echo "  pigpiod:  running" || echo "  pigpiod:  inactive"
 systemctl is-active --quiet launcher 2>/dev/null && echo "  launcher: running" || echo "  launcher: not installed"
 echo ""
 echo "Turn AP off (back to personal hotspot): sudo bash wifi.sh off"
