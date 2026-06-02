@@ -643,8 +643,8 @@
     const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*';
     const INTRO_VIDEO_URL = '/assets/Intro.mp4';
     const GLOBE_CANDIDATES = [
-      '/assets/globe.mp4', '/assets/Globe.mp4',
-      '/assets/globe.webm', '/assets/Globe.webm'
+      '/assets/globe.webm', '/assets/Globe.webm',
+      '/assets/globe.mp4', '/assets/Globe.mp4'
     ];
     const RADAR_CANDIDATES = [
       '/assets/RadarGood.webm',
@@ -1149,8 +1149,33 @@
       });
     }
 
+    function bindHudVideoLoop(video) {
+      if (!video || video._hudLoopBound) return;
+      video._hudLoopBound = true;
+      video.setAttribute('loop', '');
+      video.loop = true;
+      video.addEventListener('ended', function() {
+        video.currentTime = 0;
+        video.play().catch(function() {});
+      });
+    }
+
+    function playHudAnimVideo(video) {
+      video.muted = true;
+      video.loop = true;
+      video.setAttribute('loop', '');
+      video.playsInline = true;
+      var playPromise = video.play();
+      if (playPromise && playPromise.catch) {
+        playPromise.catch(function(err) {
+          console.warn('HUD animation play failed:', video.currentSrc || video.src, err);
+        });
+      }
+    }
+
     function setupHudAnimVideo(video, candidates) {
       if (!video || !candidates || !candidates.length) return;
+      bindHudVideoLoop(video);
       resolveAssetUrl(candidates).then(function(url) {
         if (!url) {
           console.warn('HUD asset not found:', candidates[0]);
@@ -1158,16 +1183,18 @@
           return;
         }
         video.style.visibility = 'visible';
+        bindHudVideoLoop(video);
         if (video.getAttribute('src') !== url) {
           video.setAttribute('src', url);
           video.load();
         }
-        video.muted = true;
-        video.loop = true;
-        video.playsInline = true;
-        video.play().catch(function(err) {
-          console.warn('HUD animation play failed:', url, err);
+        video.addEventListener('loadeddata', function onLoaded() {
+          video.removeEventListener('loadeddata', onLoaded);
+          playHudAnimVideo(video);
         });
+        if (video.readyState >= 2) {
+          playHudAnimVideo(video);
+        }
       });
     }
 
