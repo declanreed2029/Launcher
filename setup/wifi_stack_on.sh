@@ -25,26 +25,33 @@ fi
 
 echo "=== Launcher WiFi stack ON ==="
 
+echo "Stopping servos first..."
+systemctl stop launcher 2>/dev/null || true
+timeout 15 systemctl restart pigpiod 2>/dev/null \
+  || timeout 15 systemctl stop pigpiod 2>/dev/null || true
+sleep 0.5
+
 if ! command -v hostapd >/dev/null 2>&1 || ! command -v dnsmasq >/dev/null 2>&1; then
-  echo "Installing hostapd and dnsmasq..."
+  echo "Installing hostapd and dnsmasq (may take a few minutes)..."
   apt-get update
   apt-get install -y hostapd dnsmasq
 fi
 
 echo "Stopping previous WiFi / network managers on ${WLAN}..."
 
-systemctl stop wpa_supplicant 2>/dev/null || true
-systemctl stop wpa_supplicant@"${WLAN}".service 2>/dev/null || true
-systemctl stop dhcpcd 2>/dev/null || true
-systemctl stop NetworkManager 2>/dev/null || true
+timeout 15 systemctl stop wpa_supplicant 2>/dev/null || true
+timeout 15 systemctl stop "wpa_supplicant@${WLAN}.service" 2>/dev/null || true
+timeout 15 systemctl stop dhcpcd 2>/dev/null || true
+timeout 20 systemctl stop NetworkManager 2>/dev/null || true
 
 if command -v nmcli >/dev/null 2>&1; then
-  nmcli device set "$WLAN" managed no 2>/dev/null || true
-  nmcli device disconnect "$WLAN" 2>/dev/null || true
+  timeout 10 nmcli device set "$WLAN" managed no 2>/dev/null || true
+  timeout 10 nmcli device disconnect "$WLAN" 2>/dev/null || true
 fi
 
-pkill -f "wpa_supplicant.*${WLAN}" 2>/dev/null || true
+timeout 5 pkill -f "wpa_supplicant.*${WLAN}" 2>/dev/null || true
 sleep 1
+echo "WiFi client mode stopped."
 
 rfkill unblock wifi 2>/dev/null || true
 ip link set "$WLAN" up
@@ -112,6 +119,7 @@ if ! systemctl is-active --quiet hostapd; then
 fi
 
 echo "Starting servo stack (pigpiod + launcher HUD + pan/tilt/launch)..."
+
 if ! command -v pigpiod >/dev/null 2>&1; then
   echo "Installing pigpio..."
   apt-get update
@@ -119,7 +127,7 @@ if ! command -v pigpiod >/dev/null 2>&1; then
   systemctl daemon-reload 2>/dev/null || true
 fi
 
-systemctl start pigpiod 2>/dev/null || true
+systemctl restart pigpiod 2>/dev/null || systemctl start pigpiod 2>/dev/null || true
 for _ in $(seq 1 24); do
   systemctl is-active --quiet pigpiod && break
   sleep 0.25

@@ -6,6 +6,7 @@
 #   sudo bash wifi.sh off         # Stop AP, disable auto-start, use hotspot again
 #   sudo bash wifi.sh status      # What is running
 #   sudo bash wifi.sh sync        # Copy project -> /opt/launcher
+#   sudo bash wifi.sh servos-off  # Force PWM off immediately
 #
 # Typical use:
 #   Demo day:     sudo bash wifi.sh on
@@ -80,11 +81,25 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 EOF
-  systemctl daemon-reload
+  timeout 30 systemctl daemon-reload || systemctl daemon-reload
+}
+
+stop_servos_now() {
+  if [[ -f "${ROOT}/setup/stop_servos.sh" ]]; then
+    bash "${ROOT}/setup/stop_servos.sh"
+  else
+    echo "=== Stopping servos (PWM off) ==="
+    systemctl stop launcher 2>/dev/null || true
+    timeout 15 systemctl restart pigpiod 2>/dev/null \
+      || timeout 15 systemctl stop pigpiod 2>/dev/null || true
+    sleep 0.5
+    echo "Servos stopped."
+  fi
 }
 
 stack_on() {
   sed -i 's/\r$//' "${ROOT}/setup/wifi_stack"*.sh 2>/dev/null || true
+  stop_servos_now
   sync_to_opt
   ensure_pigpio || true
   ensure_venv
@@ -97,6 +112,7 @@ stack_on() {
 }
 
 stack_off() {
+  stop_servos_now
   sed -i 's/\r$//' "${ROOT}/setup/wifi_stack_off.sh" 2>/dev/null || true
   bash "${ROOT}/setup/wifi_stack_off.sh"
 }
@@ -137,6 +153,9 @@ case "$CMD" in
     ensure_launcher_service
     echo "Synced. Run: sudo bash wifi.sh on"
     ;;
+  servos-off|stop-servos)
+    stop_servos_now
+    ;;
   status)
     stack_status
     ;;
@@ -145,6 +164,7 @@ case "$CMD" in
     echo "  sudo bash wifi.sh on           # Launcher AP now only"
     echo "  sudo bash wifi.sh on --boot    # Launcher AP now + every reboot"
     echo "  sudo bash wifi.sh off          # Stop AP, use personal hotspot"
+    echo "  sudo bash wifi.sh servos-off   # Force servos off now"
     echo "  sudo bash wifi.sh status"
     echo "  sudo bash wifi.sh sync"
     exit 1

@@ -13,9 +13,14 @@ WLAN="${WLAN_INTERFACE:-wlan0}"
 
 echo "=== Stopping Launcher WiFi stack ==="
 
-echo "Stopping servo stack (launcher HUD + pigpiod)..."
-systemctl stop launcher 2>/dev/null || true
-systemctl stop pigpiod 2>/dev/null || true
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/stop_servos.sh" ]]; then
+  bash "${SCRIPT_DIR}/stop_servos.sh"
+else
+  echo "Stopping servo stack (launcher HUD + pigpiod)..."
+  systemctl stop launcher 2>/dev/null || true
+  systemctl stop pigpiod 2>/dev/null || true
+fi
 systemctl disable launcher pigpiod 2>/dev/null || true
 
 systemctl stop hostapd 2>/dev/null || true
