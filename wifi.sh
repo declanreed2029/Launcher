@@ -72,13 +72,38 @@ ensure_venv() {
   echo "=== [venv] Done ==="
 }
 
+_daemon_reload_safe() {
+  echo "=== [service] systemctl daemon-reload (max 15s) ==="
+  if command -v timeout >/dev/null 2>&1; then
+    if timeout 15 systemctl daemon-reload; then
+      echo "=== [service] daemon-reload OK ==="
+      return 0
+    fi
+    echo "WARNING: daemon-reload timed out — continuing anyway"
+    return 0
+  fi
+  systemctl daemon-reload &
+  local pid=$!
+  local i
+  for i in $(seq 1 15); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      echo "=== [service] daemon-reload OK ==="
+      return 0
+    fi
+    sleep 1
+  done
+  kill "$pid" 2>/dev/null || true
+  echo "WARNING: daemon-reload still running after 15s — continuing anyway"
+}
+
 ensure_launcher_service() {
-  echo "=== Ensuring launcher.service (HUD + all servos) ==="
-  tee /etc/systemd/system/launcher.service > /dev/null <<EOF
+  local svc="/etc/systemd/system/launcher.service"
+  local tmp
+  tmp="$(mktemp)"
+  cat > "$tmp" <<EOF
 [Unit]
 Description=Launcher HUD web server (pan, tilt, launch servos)
 After=network.target pigpiod.service
-Requires=pigpiod.service
 Wants=pigpiod.service
 
 [Service]
@@ -92,7 +117,16 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 EOF
-  timeout 30 systemctl daemon-reload || systemctl daemon-reload
+  if [[ -f "$svc" ]] && cmp -s "$tmp" "$svc"; then
+    echo "=== [service] launcher.service unchanged — skip daemon-reload ==="
+    rm -f "$tmp"
+    return 0
+  fi
+  echo "=== [service] Installing launcher.service ==="
+  cp "$tmp" "$svc"
+  rm -f "$tmp"
+  _daemon_reload_safe
+  echo "=== [service] Done ==="
 }
 
 stop_servos_now() {
