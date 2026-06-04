@@ -35,22 +35,38 @@ sync_to_opt() {
   echo "Sync done."
 }
 
+ensure_pigpio() {
+  if command -v pigpiod >/dev/null 2>&1 \
+     && { systemctl cat pigpiod.service &>/dev/null \
+          || [[ -f /lib/systemd/system/pigpiod.service ]]; }; then
+    return 0
+  fi
+  echo "=== Installing pigpio (required for servos) ==="
+  apt-get update
+  if apt-get install -y pigpio 2>/dev/null; then
+    systemctl daemon-reload
+    return 0
+  fi
+  echo "WARNING: pigpio package not found — run: sudo bash setup/install.sh"
+  return 1
+}
+
 ensure_venv() {
   if [[ ! -x "${INSTALL_DIR}/.venv/bin/python" ]]; then
     echo "=== Creating Python venv in ${INSTALL_DIR} ==="
     sudo -u "${SUDO_USER:-dtcteam2}" python3 -m venv "${INSTALL_DIR}/.venv"
-    sudo -u "${SUDO_USER:-dtcteam2}" "${INSTALL_DIR}/.venv/bin/pip" install --upgrade pip
-    sudo -u "${SUDO_USER:-dtcteam2}" "${INSTALL_DIR}/.venv/bin/pip" install -r "${INSTALL_DIR}/requirements.txt"
   fi
+  sudo -u "${SUDO_USER:-dtcteam2}" "${INSTALL_DIR}/.venv/bin/pip" install --upgrade pip -q
+  sudo -u "${SUDO_USER:-dtcteam2}" "${INSTALL_DIR}/.venv/bin/pip" install -r "${INSTALL_DIR}/requirements.txt" -q
 }
 
 ensure_launcher_service() {
-  if [[ ! -f /etc/systemd/system/launcher.service ]]; then
-    echo "=== Creating launcher.service ==="
-    tee /etc/systemd/system/launcher.service > /dev/null <<EOF
+  echo "=== Ensuring launcher.service (HUD + all servos) ==="
+  tee /etc/systemd/system/launcher.service > /dev/null <<EOF
 [Unit]
-Description=Launcher HUD web server
+Description=Launcher HUD web server (pan, tilt, launch servos)
 After=network.target pigpiod.service
+Requires=pigpiod.service
 Wants=pigpiod.service
 
 [Service]
@@ -64,13 +80,13 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 EOF
-    systemctl daemon-reload
-  fi
+  systemctl daemon-reload
 }
 
 stack_on() {
   sed -i 's/\r$//' "${ROOT}/setup/wifi_stack"*.sh 2>/dev/null || true
   sync_to_opt
+  ensure_pigpio || true
   ensure_venv
   ensure_launcher_service
   if [[ "$FLAG" == "--boot" ]]; then
@@ -96,6 +112,15 @@ stack_status() {
   systemctl is-active dnsmasq 2>/dev/null && echo "dnsmasq:  active" || echo "dnsmasq:  inactive"
   systemctl is-active pigpiod 2>/dev/null && echo "pigpiod:  active" || echo "pigpiod:  inactive"
   systemctl is-active launcher 2>/dev/null && echo "launcher: active" || echo "launcher: inactive"
+  if systemctl is-active --quiet launcher 2>/dev/null \
+     && journalctl -u launcher -n 40 --no-pager 2>/dev/null | grep -q "Servos ready"; then
+    echo "servos:   ready (pan GPIO18, tilt GPIO19, launch GPIO20)"
+  elif systemctl is-active --quiet launcher 2>/dev/null; then
+    echo "servos:   NOT READY — run: sudo systemctl restart launcher"
+    echo "          logs: journalctl -u launcher -n 20"
+  else
+    echo "servos:   offline (start with: sudo bash wifi.sh on)"
+  fi
   ip -4 addr show wlan0 2>/dev/null | grep -oP 'inet \K[0-9.]+' | head -1 | xargs -I{} echo "wlan0 IP: {}" || true
 }
 

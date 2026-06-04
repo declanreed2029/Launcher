@@ -25,6 +25,8 @@ LAUNCH_FIRE_DEG = 90
 
 SERVO_MIN_PULSE_US = 500
 SERVO_MAX_PULSE_US = 2500
+# Stop PWM after each move so servos do not buzz/hunt while idle (ms)
+SERVO_RELEASE_MS = 400
 
 PAN_MIN_DEG = -180
 PAN_MAX_DEG = 180

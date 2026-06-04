@@ -111,17 +111,36 @@ if ! systemctl is-active --quiet hostapd; then
   exit 1
 fi
 
-echo "Starting servo stack (pigpiod + launcher HUD)..."
+echo "Starting servo stack (pigpiod + launcher HUD + pan/tilt/launch)..."
+if ! command -v pigpiod >/dev/null 2>&1; then
+  echo "Installing pigpio..."
+  apt-get update
+  apt-get install -y pigpio || true
+  systemctl daemon-reload 2>/dev/null || true
+fi
+
 systemctl start pigpiod 2>/dev/null || true
-for _ in $(seq 1 20); do
+for _ in $(seq 1 24); do
   systemctl is-active --quiet pigpiod && break
   sleep 0.25
 done
 if ! systemctl is-active --quiet pigpiod; then
-  echo "WARNING: pigpiod did not start — servos will not move until it is running."
+  echo ""
+  echo "ERROR: pigpiod is not running — servos will not work."
+  echo "  Try: sudo bash setup/install.sh"
+  echo "  Or:  sudo systemctl start pigpiod && sudo systemctl restart launcher"
+  exit 1
 fi
 
 systemctl restart launcher 2>/dev/null || systemctl start launcher 2>/dev/null || true
+sleep 2
+if journalctl -u launcher -n 50 --no-pager 2>/dev/null | grep -q "Servos ready"; then
+  echo "Servos initialized (pan, tilt, launch)."
+else
+  echo "WARNING: launcher running but servos may not be ready — restarting launcher..."
+  systemctl restart launcher
+  sleep 2
+fi
 
 if [[ "$ENABLE_BOOT" -eq 1 ]]; then
   systemctl enable pigpiod launcher 2>/dev/null || true
@@ -144,6 +163,11 @@ systemctl is-active --quiet hostapd && echo "  hostapd:  running" || echo "  hos
 systemctl is-active --quiet dnsmasq && echo "  dnsmasq:  running" || echo "  dnsmasq:  FAILED"
 systemctl is-active --quiet pigpiod 2>/dev/null && echo "  pigpiod:  running" || echo "  pigpiod:  inactive"
 systemctl is-active --quiet launcher 2>/dev/null && echo "  launcher: running" || echo "  launcher: not installed"
+if journalctl -u launcher -n 50 --no-pager 2>/dev/null | grep -q "Servos ready"; then
+  echo "  servos:   ready (pan/tilt/launch)"
+else
+  echo "  servos:   check logs: journalctl -u launcher -n 20"
+fi
 echo ""
 echo "Turn AP off (back to personal hotspot): sudo bash wifi.sh off"
 echo "SSH on Launcher WiFi: ssh dtcteam2@${AP_IP%/*}"
