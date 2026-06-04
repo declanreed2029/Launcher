@@ -9,10 +9,11 @@ WIFI_CHANNEL = 6
 WEB_HOST = "0.0.0.0"
 WEB_PORT = 80
 
-# Servo signal wires -> BCM GPIO
-PAN_SERVO_GPIO = 18   # left / right (matches ESP32 PAN_SERVO_GPIO)
-TILT_SERVO_GPIO = 19  # up / down — wire second servo here
-LAUNCH_SERVO_GPIO = 20  # launch mechanism — third servo
+# Servo signal wires -> BCM GPIO (BCM numbering, not physical pin #)
+PAN_SERVO_GPIO = 18   # left / right — physical pin 12
+TILT_SERVO_GPIO = 19  # up / down — physical pin 35
+LAUNCH_SERVO_GPIO = 20  # launch — physical pin 38
+# If tilt/launch don't move but pan does, swap tilt/launch GPIOs here and re-sync.
 SERVO_GPIO = PAN_SERVO_GPIO  # alias for older configs
 
 # Launch sequence (Lock → 3s countdown → 90° hold → rest → cooldown display)
@@ -27,6 +28,8 @@ SERVO_MIN_PULSE_US = 500
 SERVO_MAX_PULSE_US = 2500
 # Stop PWM after each move so servos do not buzz/hunt while idle (ms)
 SERVO_RELEASE_MS = 400
+SERVO_TILT_RELEASE_MS = 1200  # tilt often needs longer drive than pan
+LAUNCH_RETURN_SETTLE_SEC = 1.0  # hold rest position before PWM off
 
 PAN_MIN_DEG = -180
 PAN_MAX_DEG = 180

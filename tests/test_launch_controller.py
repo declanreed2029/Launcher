@@ -45,29 +45,18 @@ class TestLaunchController(unittest.TestCase):
         launch_controller.reset()
 
     @patch("launch_controller._wait_until")
-    @patch("launch_controller.servos.set_launch_deg")
-    @patch("launch_controller.time.sleep", return_value=None)
-    def test_launch_sequence_fires_then_rests(
-        self, mock_sleep, mock_set_launch, mock_wait
-    ) -> None:
+    @patch("launch_controller.servos.run_launch_sequence")
+    def test_launch_sequence_fires_then_rests(self, mock_run, mock_wait) -> None:
         launch_controller.arm()
         launch_controller.try_launch()
         if launch_controller._sequence_thread:
             launch_controller._sequence_thread.join(timeout=5)
 
-        mock_set_launch.assert_any_call(config.LAUNCH_FIRE_DEG)
-        mock_set_launch.assert_any_call(config.LAUNCH_REST_DEG)
-        calls = [c[0][0] for c in mock_set_launch.call_args_list]
-        self.assertLess(
-            calls.index(config.LAUNCH_FIRE_DEG), calls.index(config.LAUNCH_REST_DEG)
-        )
+        mock_run.assert_called_once()
 
     @patch("launch_controller._wait_until")
-    @patch("launch_controller.servos.set_launch_deg")
-    @patch("launch_controller.time.sleep", return_value=None)
-    def test_launch_sets_cooldown_after_sequence(
-        self, mock_sleep, mock_set_launch, mock_wait
-    ) -> None:
+    @patch("launch_controller.servos.run_launch_sequence")
+    def test_launch_sets_cooldown_after_sequence(self, mock_run, mock_wait) -> None:
         launch_controller.arm()
         launch_controller.try_launch()
         if launch_controller._sequence_thread:
@@ -80,11 +69,8 @@ class TestLaunchController(unittest.TestCase):
         )
 
     @patch("launch_controller._wait_until")
-    @patch("launch_controller.servos.set_launch_deg")
-    @patch("launch_controller.time.sleep", return_value=None)
-    def test_double_launch_rejected_while_busy(
-        self, mock_sleep, mock_set_launch, mock_wait
-    ) -> None:
+    @patch("launch_controller.servos.run_launch_sequence")
+    def test_double_launch_rejected_while_busy(self, mock_run, mock_wait) -> None:
         launch_controller.arm()
         first = launch_controller.try_launch()
         self.assertTrue(first["ok"])

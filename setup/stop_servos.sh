@@ -49,20 +49,32 @@ release_with_python() {
   if [[ -z "$py" ]]; then
     return 1
   fi
-  "$py" <<'PY'
+  PAN_GPIO="$PAN_GPIO" TILT_GPIO="$TILT_GPIO" LAUNCH_GPIO="$LAUNCH_GPIO" "$py" <<'PY'
+import os
 import pigpio
+
+pins = (
+    int(os.environ.get("PAN_GPIO", 18)),
+    int(os.environ.get("TILT_GPIO", 19)),
+    int(os.environ.get("LAUNCH_GPIO", 20)),
+)
 pi = pigpio.pi()
 if not pi.connected:
     raise SystemExit("pigpio not connected")
-for g in (18, 19, 20):
+for g in pins:
     pi.set_servo_pulsewidth(g, 0)
+    pi.set_mode(g, pigpio.INPUT)
+    pi.set_pull_up_down(g, pigpio.PUD_OFF)
 pi.stop()
-print("PWM released on GPIO 18, 19, 20")
+print("PWM off + pins released:", ", ".join(str(p) for p in pins))
 PY
 }
 
 if release_with_pigs; then
   echo "Released PWM via pigs."
+  for g in "$PAN_GPIO" "$TILT_GPIO" "$LAUNCH_GPIO"; do
+    pigs mod "$g" r 2>/dev/null || true
+  done
 elif release_with_python; then
   echo "Released PWM via Python/pigpio."
 else
@@ -72,5 +84,10 @@ fi
 systemctl stop pigpiod 2>/dev/null || true
 killall pigpiod 2>/dev/null || true
 
-echo "Done. Servos should be quiet."
-echo "If they still buzz, disconnect servo signal wires or power."
+echo ""
+echo "Done. If a servo STILL moves, it is almost certainly:"
+echo "  1) Signal wire on the WRONG GPIO (not 18/19/20), or"
+echo "  2) Not controlled by the Pi (other board / wiring), or"
+echo "  3) Power still on — unplug that servo's SIGNAL wire to test."
+echo ""
+echo "Which one moves?  Pan (left/right)=GPIO18  Tilt=19  Launch=20"

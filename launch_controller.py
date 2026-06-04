@@ -120,9 +120,7 @@ def _run_sequence() -> None:
             _phase = "firing"
             _countdown_until = None
 
-        servos.set_launch_deg(config.LAUNCH_FIRE_DEG, hold=True)
-        time.sleep(config.LAUNCH_HOLD_SEC)
-        servos.set_launch_deg(config.LAUNCH_REST_DEG)
+        servos.run_launch_sequence()
 
         with _lock:
             _phase = "idle"
@@ -133,7 +131,7 @@ def _run_sequence() -> None:
         with _lock:
             _phase = "idle"
             _countdown_until = None
-            servos.set_launch_deg(config.LAUNCH_REST_DEG, hold=False)
+            servos.release_launch()
 
 
 def reset() -> None:

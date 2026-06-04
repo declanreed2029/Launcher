@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 
 import config
 
@@ -43,8 +44,14 @@ def _cancel_release(gpio: int) -> None:
         timer.cancel()
 
 
+def _release_ms_for_gpio(gpio: int) -> int:
+    if gpio == config.TILT_SERVO_GPIO:
+        return config.SERVO_TILT_RELEASE_MS
+    return config.SERVO_RELEASE_MS
+
+
 def _schedule_release(gpio: int) -> None:
-    delay_s = config.SERVO_RELEASE_MS / 1000.0
+    delay_s = _release_ms_for_gpio(gpio) / 1000.0
 
     def _release() -> None:
         if _pi is not None:
@@ -133,7 +140,14 @@ def set_tilt_deg(tilt_deg: int) -> None:
     servo_angle = tilt_deg_to_servo_angle(tilt_deg)
     pulse_us = angle_to_pulse_us(servo_angle)
     _drive(config.TILT_SERVO_GPIO, pulse_us, hold=False)
-    log.debug("tilt=%d -> %d deg (%d us)", tilt_deg, servo_angle, pulse_us)
+    log.info("tilt=%d -> %d deg (%d us)", tilt_deg, servo_angle, pulse_us)
+
+
+def release_launch() -> None:
+    """Stop PWM on launch pin only."""
+    _cancel_release(config.LAUNCH_SERVO_GPIO)
+    if _pi is not None:
+        _pi.set_servo_pulsewidth(config.LAUNCH_SERVO_GPIO, 0)
 
 
 def set_launch_deg(angle_deg: int, *, hold: bool = False) -> None:
@@ -141,9 +155,18 @@ def set_launch_deg(angle_deg: int, *, hold: bool = False) -> None:
         return
 
     angle_deg = max(0, min(180, angle_deg))
-    pulse_us = angle_to_pulse_us(angle_deg) if angle_deg > 0 else 0
+    pulse_us = angle_to_pulse_us(angle_deg)
     _drive(config.LAUNCH_SERVO_GPIO, pulse_us, hold=hold)
     log.info("launch servo -> %d deg (%d us, hold=%s)", angle_deg, pulse_us, hold)
+
+
+def run_launch_sequence() -> None:
+    """Fire to LAUNCH_FIRE_DEG, hold, return to LAUNCH_REST_DEG, then release PWM."""
+    set_launch_deg(config.LAUNCH_FIRE_DEG, hold=True)
+    time.sleep(config.LAUNCH_HOLD_SEC)
+    set_launch_deg(config.LAUNCH_REST_DEG, hold=True)
+    time.sleep(config.LAUNCH_RETURN_SETTLE_SEC)
+    release_launch()
 
 
 def cleanup() -> None:
