@@ -33,8 +33,8 @@ sleep 0.5
 
 if ! command -v hostapd >/dev/null 2>&1 || ! command -v dnsmasq >/dev/null 2>&1; then
   echo "Installing hostapd and dnsmasq (may take a few minutes)..."
-  apt-get update
-  apt-get install -y hostapd dnsmasq
+  timeout 120 apt-get update || apt-get update
+  timeout 300 apt-get install -y hostapd dnsmasq || apt-get install -y hostapd dnsmasq
 fi
 
 echo "Stopping previous WiFi / network managers on ${WLAN}..."

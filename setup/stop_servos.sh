@@ -72,20 +72,19 @@ PY
 
 if release_with_pigs; then
   echo "Released PWM via pigs."
-  for g in "$PAN_GPIO" "$TILT_GPIO" "$LAUNCH_GPIO"; do
-    pigs mod "$g" r 2>/dev/null || true
-  done
 elif release_with_python; then
   echo "Released PWM via Python/pigpio."
 else
   echo "WARNING: could not release PWM — is pigpio installed?"
 fi
 
-systemctl stop pigpiod 2>/dev/null || true
-killall pigpiod 2>/dev/null || true
+echo "Stopping pigpiod..."
+timeout 10 systemctl stop pigpiod 2>/dev/null || true
+timeout 5 killall pigpiod 2>/dev/null || true
 
+echo "=== Servo stop complete ==="
 echo ""
-echo "Done. If a servo STILL moves, it is almost certainly:"
+echo "If a servo STILL moves, it is almost certainly:"
 echo "  1) Signal wire on the WRONG GPIO (not 18/19/20), or"
 echo "  2) Not controlled by the Pi (other board / wiring), or"
 echo "  3) Power still on — unplug that servo's SIGNAL wire to test."

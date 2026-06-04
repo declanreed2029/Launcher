@@ -25,15 +25,16 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 sync_to_opt() {
-  echo "=== Syncing ${ROOT} -> ${INSTALL_DIR} ==="
+  echo "=== [sync] Copying ${ROOT} -> ${INSTALL_DIR} (large videos may take 1-2 min) ==="
   mkdir -p "$INSTALL_DIR"
-  rsync -a --exclude '__pycache__' --exclude '.venv' "${ROOT}/" "${INSTALL_DIR}/"
+  rsync -a --info=STATS2 --exclude '__pycache__' --exclude '.venv' "${ROOT}/" "${INSTALL_DIR}/" || \
+    rsync -a --exclude '__pycache__' --exclude '.venv' "${ROOT}/" "${INSTALL_DIR}/"
   if [[ -d "${ROOT}/assets" ]]; then
     mkdir -p "${INSTALL_DIR}/assets"
-    rsync -a "${ROOT}/assets/" "${INSTALL_DIR}/assets/"
+    rsync -a "${ROOT}/assets/" "${INSTALL_DIR}/assets/" || true
   fi
   chown -R "${SUDO_USER:-dtcteam2}:${SUDO_USER:-dtcteam2}" "$INSTALL_DIR"
-  echo "Sync done."
+  echo "=== [sync] Done ==="
 }
 
 ensure_pigpio() {
@@ -53,12 +54,22 @@ ensure_pigpio() {
 }
 
 ensure_venv() {
+  local req="${INSTALL_DIR}/requirements.txt"
+  local marker="${INSTALL_DIR}/.venv/.deps_installed"
   if [[ ! -x "${INSTALL_DIR}/.venv/bin/python" ]]; then
-    echo "=== Creating Python venv in ${INSTALL_DIR} ==="
+    echo "=== [venv] Creating Python venv ==="
     sudo -u "${SUDO_USER:-dtcteam2}" python3 -m venv "${INSTALL_DIR}/.venv"
   fi
-  sudo -u "${SUDO_USER:-dtcteam2}" "${INSTALL_DIR}/.venv/bin/pip" install --upgrade pip -q
-  sudo -u "${SUDO_USER:-dtcteam2}" "${INSTALL_DIR}/.venv/bin/pip" install -r "${INSTALL_DIR}/requirements.txt" -q
+  if [[ -f "$marker" ]] && [[ "$req" -ot "$marker" ]]; then
+    echo "=== [venv] Dependencies unchanged, skipping pip install ==="
+    return 0
+  fi
+  echo "=== [venv] Installing Python packages (timeout 3 min) ==="
+  timeout 180 sudo -u "${SUDO_USER:-dtcteam2}" "${INSTALL_DIR}/.venv/bin/pip" install --upgrade pip -q || true
+  timeout 180 sudo -u "${SUDO_USER:-dtcteam2}" "${INSTALL_DIR}/.venv/bin/pip" install \
+    -r "${INSTALL_DIR}/requirements.txt" -q
+  touch "$marker"
+  echo "=== [venv] Done ==="
 }
 
 ensure_launcher_service() {
@@ -98,17 +109,21 @@ stop_servos_now() {
 }
 
 stack_on() {
+  echo "=== wifi.sh on: starting ==="
   sed -i 's/\r$//' "${ROOT}/setup/wifi_stack"*.sh 2>/dev/null || true
   stop_servos_now
   sync_to_opt
+  echo "=== [pigpio] Checking pigpio ==="
   ensure_pigpio || true
   ensure_venv
   ensure_launcher_service
+  echo "=== [wifi] Starting access point stack ==="
   if [[ "$FLAG" == "--boot" ]]; then
     bash "${ROOT}/setup/wifi_stack_on.sh" --boot
   else
     bash "${ROOT}/setup/wifi_stack_on.sh"
   fi
+  echo "=== wifi.sh on: finished ==="
 }
 
 stack_off() {
