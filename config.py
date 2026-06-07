@@ -31,7 +31,7 @@ SERVO_MAX_PULSE_US = 2500
 # Stop PWM after each move so servos do not buzz/hunt while idle (ms)
 SERVO_RELEASE_MS = 400
 SERVO_TILT_RELEASE_MS = 1200  # tilt often needs longer drive than pan
-LAUNCH_RETURN_SETTLE_SEC = 1.0  # hold rest position before PWM off
+LAUNCH_RETURN_MS = 1500  # ms to drive to rest before PWM off (no sustained hold)
 
 PAN_MIN_DEG = -180
 PAN_MAX_DEG = 180

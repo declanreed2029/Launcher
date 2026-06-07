@@ -47,6 +47,8 @@ def _cancel_release(gpio: int) -> None:
 def _release_ms_for_gpio(gpio: int) -> int:
     if gpio == config.TILT_SERVO_GPIO:
         return config.SERVO_TILT_RELEASE_MS
+    if gpio == config.LAUNCH_SERVO_GPIO:
+        return config.LAUNCH_RETURN_MS
     return config.SERVO_RELEASE_MS
 
 
@@ -162,11 +164,23 @@ def set_tilt_deg(tilt_deg: int) -> None:
     log.info("tilt=%d -> %d deg (%d us)", tilt_deg, servo_angle, pulse_us)
 
 
+def _ensure_launch_output() -> None:
+    if _pi is not None:
+        import pigpio
+
+        _pi.set_mode(config.LAUNCH_SERVO_GPIO, pigpio.OUTPUT)
+
+
 def release_launch() -> None:
-    """Stop PWM on launch pin only."""
+    """Stop PWM on launch pin and float the line to avoid post-move jitter."""
     _cancel_release(config.LAUNCH_SERVO_GPIO)
     if _pi is not None:
+        import pigpio
+
         _pi.set_servo_pulsewidth(config.LAUNCH_SERVO_GPIO, 0)
+        time.sleep(0.05)
+        _pi.set_mode(config.LAUNCH_SERVO_GPIO, pigpio.INPUT)
+        _pi.set_pull_up_down(config.LAUNCH_SERVO_GPIO, pigpio.PUD_OFF)
 
 
 def launch_deg_to_servo_angle(angle_deg: int) -> int:
@@ -181,6 +195,7 @@ def set_launch_deg(angle_deg: int, *, hold: bool = False) -> None:
     if not ensure_ready() or _pi is None:
         return
 
+    _ensure_launch_output()
     angle_deg = max(0, min(180, angle_deg))
     servo_angle = launch_deg_to_servo_angle(angle_deg)
     pulse_us = angle_to_pulse_us(servo_angle)
@@ -196,11 +211,12 @@ def set_launch_deg(angle_deg: int, *, hold: bool = False) -> None:
 
 
 def run_launch_sequence() -> None:
-    """Fire to LAUNCH_FIRE_DEG, hold, return to LAUNCH_REST_DEG, then release PWM."""
+    """Fire (held), return to rest with one timed pulse, then float the pin."""
+    _ensure_launch_output()
     set_launch_deg(config.LAUNCH_FIRE_DEG, hold=True)
     time.sleep(config.LAUNCH_HOLD_SEC)
-    set_launch_deg(config.LAUNCH_REST_DEG, hold=True)
-    time.sleep(config.LAUNCH_RETURN_SETTLE_SEC)
+    set_launch_deg(config.LAUNCH_REST_DEG, hold=False)
+    time.sleep(config.LAUNCH_RETURN_MS / 1000.0 + 0.15)
     release_launch()
 
 
