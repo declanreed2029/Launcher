@@ -79,36 +79,6 @@
 
     #boot-text.fading { opacity: 0; }
 
-    #intro-screen {
-      position: fixed;
-      inset: 0;
-      z-index: 90;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.6s ease;
-    }
-
-    #intro-screen.visible {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    #intro-screen.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    #intro-video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      background: #000;
-    }
-
     #control-panel {
       position: fixed;
       inset: 0;
@@ -526,8 +496,8 @@
 
     .dpad {
       display: grid;
-      grid-template-columns: 116px 116px 116px;
-      grid-template-rows: 116px 116px 116px;
+      grid-template-columns: 116px;
+      grid-template-rows: 116px 116px;
       gap: 8px;
       justify-items: center;
       align-items: center;
@@ -553,10 +523,8 @@
       background: rgba(150, 150, 150, 0.7);
     }
 
-    .arrow-btn.up { grid-column: 2; grid-row: 1; clip-path: polygon(50% 6%, 88% 82%, 12% 82%); }
-    .arrow-btn.down { grid-column: 2; grid-row: 3; clip-path: polygon(12% 18%, 88% 18%, 50% 94%); }
-    .arrow-btn.left { grid-column: 1; grid-row: 2; clip-path: polygon(6% 50%, 82% 12%, 82% 88%); }
-    .arrow-btn.right { grid-column: 3; grid-row: 2; clip-path: polygon(18% 12%, 94% 50%, 18% 88%); }
+    .arrow-btn.up { grid-column: 1; grid-row: 1; clip-path: polygon(50% 6%, 88% 82%, 12% 82%); }
+    .arrow-btn.down { grid-column: 1; grid-row: 2; clip-path: polygon(12% 18%, 88% 18%, 50% 94%); }
   </style>
 </head>
 <body>
@@ -568,10 +536,6 @@
       <path class="wifi-arc arc3" d="M 0 60 A 40 40 0 0 1 80 60"/>
     </svg>
     <div id="boot-text"></div>
-  </div>
-
-  <div id="intro-screen" aria-hidden="true">
-    <video id="intro-video" playsinline preload="auto" loop="false"></video>
   </div>
 
   <div id="control-panel">
@@ -632,8 +596,6 @@
     <div id="control-center">
       <div class="dpad" aria-label="Directional controls">
         <button class="arrow-btn up" type="button" data-cmd="up" aria-label="Up"></button>
-        <button class="arrow-btn left" type="button" data-cmd="left" aria-label="Left"></button>
-        <button class="arrow-btn right" type="button" data-cmd="right" aria-label="Right"></button>
         <button class="arrow-btn down" type="button" data-cmd="down" aria-label="Down"></button>
       </div>
     </div>
@@ -641,7 +603,6 @@
 
   <script>
     const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*';
-    const INTRO_VIDEO_URL = '/assets/Intro.mp4';
     const GLOBE_CANDIDATES = [
       '/assets/globe.webm', '/assets/Globe.webm',
       '/assets/globe.mp4', '/assets/Globe.mp4'
@@ -988,125 +949,15 @@
         if (i < BOOT_MESSAGES.length - 1) await fadeBootText(msg.fade);
       }
       await fadeBootText(BOOT_MESSAGES[BOOT_MESSAGES.length - 1].fade);
-      finishBootAndPlayIntro();
+      finishBootAndShowHud();
     }
 
-    function waitForVideoEvent(video, eventName) {
-      return new Promise(function(resolve) {
-        if (eventName === 'ended' && video.ended) {
-          resolve();
-          return;
-        }
-        video.addEventListener(eventName, resolve, { once: true });
-      });
-    }
-
-    function waitForIntroReady(video, timeoutMs) {
-      return new Promise(function(resolve, reject) {
-        if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
-          resolve();
-          return;
-        }
-        function cleanup() {
-          clearTimeout(timer);
-          video.removeEventListener('canplaythrough', onReady);
-          video.removeEventListener('error', onError);
-        }
-        function onReady() {
-          cleanup();
-          resolve();
-        }
-        function onError() {
-          cleanup();
-          var detail = video.error ? video.error.code : 'unknown';
-          reject(new Error('Intro video failed to load (code ' + detail + ')'));
-        }
-        var timer = setTimeout(function() {
-          cleanup();
-          reject(new Error('Intro video load timed out'));
-        }, timeoutMs);
-        video.addEventListener('canplaythrough', onReady, { once: true });
-        video.addEventListener('error', onError, { once: true });
-      });
-    }
-
-    function preloadIntroVideo() {
-      var video = document.getElementById('intro-video');
-      video.loop = false;
-      if (video.getAttribute('src') !== INTRO_VIDEO_URL) {
-        video.setAttribute('src', INTRO_VIDEO_URL);
-        video.load();
-      }
-    }
-
-    async function startIntroPlayback(video) {
-      video.loop = false;
-      video.currentTime = 0;
-      try {
-        video.muted = false;
-        await video.play();
-        return;
-      } catch (err) {
-        console.warn('Unmuted autoplay blocked, retrying muted:', err);
-      }
-      video.muted = true;
-      await video.play();
-    }
-
-    async function playIntroVideo() {
-      var introScreen = document.getElementById('intro-screen');
-      var video = document.getElementById('intro-video');
-      preloadIntroVideo();
-
-      introScreen.style.display = 'flex';
-      introScreen.setAttribute('aria-hidden', 'false');
-      introScreen.classList.add('visible');
-      await sleep(400);
-
-      try {
-        await waitForIntroReady(video, 20000);
-      } catch (err) {
-        console.warn(err.message);
-        return;
-      }
-
-      try {
-        await startIntroPlayback(video);
-      } catch (err) {
-        console.warn('Intro video could not play:', err);
-        return;
-      }
-
-      if (video.paused) {
-        console.warn('Intro video play() resolved but video is still paused');
-        return;
-      }
-
-      await waitForVideoEvent(video, 'ended');
-    }
-
-    async function hideIntroScreen() {
-      const introScreen = document.getElementById('intro-screen');
-      const video = document.getElementById('intro-video');
-      introScreen.classList.add('hidden');
-      introScreen.classList.remove('visible');
-      await sleep(600);
-      video.pause();
-      video.removeAttribute('src');
-      video.load();
-      introScreen.style.display = 'none';
-      introScreen.setAttribute('aria-hidden', 'true');
-      introScreen.classList.remove('hidden');
-    }
-
-    async function finishBootAndPlayIntro() {
+    async function finishBootAndShowHud() {
       const boot = document.getElementById('boot-screen');
       stopSignalIconAnimation();
       boot.classList.add('hidden');
-      await sleep(1000);
+      await sleep(600);
       boot.style.display = 'none';
-      await playIntroVideo();
-      await hideIntroScreen();
       revealControlPanel();
     }
 
@@ -1205,8 +1056,6 @@
 
     window.onload = function() {
       hideControlPanel();
-      document.getElementById('intro-screen').style.display = 'none';
-      preloadIntroVideo();
       setupHudAnimVideo(document.getElementById('hud-globe'), GLOBE_CANDIDATES);
       setupHudAnimVideo(document.getElementById('hud-radar'), RADAR_CANDIDATES);
       startSignalIconAnimation();
