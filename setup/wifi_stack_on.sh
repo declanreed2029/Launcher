@@ -119,35 +119,12 @@ if ! systemctl is-active --quiet hostapd; then
 fi
 
 echo "Starting servo stack (pigpiod + launcher HUD + pan/tilt/launch)..."
-
-if ! command -v pigpiod >/dev/null 2>&1; then
-  echo "Installing pigpio..."
-  apt-get update
-  apt-get install -y pigpio || true
-  systemctl daemon-reload 2>/dev/null || true
-fi
-
-systemctl restart pigpiod 2>/dev/null || systemctl start pigpiod 2>/dev/null || true
-for _ in $(seq 1 24); do
-  systemctl is-active --quiet pigpiod && break
-  sleep 0.25
-done
-if ! systemctl is-active --quiet pigpiod; then
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if ! bash "${SCRIPT_DIR}/start_servos.sh"; then
   echo ""
-  echo "ERROR: pigpiod is not running — servos will not work."
-  echo "  Try: sudo bash setup/install.sh"
-  echo "  Or:  sudo systemctl start pigpiod && sudo systemctl restart launcher"
+  echo "ERROR: Servo stack failed to start."
+  echo "  Try manually: sudo bash ${SCRIPT_DIR}/start_servos.sh"
   exit 1
-fi
-
-systemctl restart launcher 2>/dev/null || systemctl start launcher 2>/dev/null || true
-sleep 2
-if journalctl -u launcher -n 50 --no-pager 2>/dev/null | grep -q "Servos ready"; then
-  echo "Servos initialized (pan, tilt, launch)."
-else
-  echo "WARNING: launcher running but servos may not be ready — restarting launcher..."
-  systemctl restart launcher
-  sleep 2
 fi
 
 if [[ "$ENABLE_BOOT" -eq 1 ]]; then

@@ -19,7 +19,7 @@ SERVO_GPIO = PAN_SERVO_GPIO  # alias for older configs
 # Launch sequence (Lock → 3s countdown → 90° hold → rest → cooldown display)
 LAUNCH_ARM_SEC = 10
 LAUNCH_COUNTDOWN_SEC = 3
-LAUNCH_HOLD_SEC = 10
+LAUNCH_HOLD_SEC = 0.5
 LAUNCH_COOLDOWN_SEC = 30
 LAUNCH_REST_DEG = 0
 LAUNCH_FIRE_DEG = 90

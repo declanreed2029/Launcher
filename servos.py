@@ -94,8 +94,15 @@ def release_all() -> None:
             _pi.set_servo_pulsewidth(gpio, 0)
 
 
-def init() -> None:
+def is_ready() -> bool:
+    return _ready
+
+
+def init() -> bool:
     global _pi, _ready
+
+    if _ready and _pi is not None:
+        return True
 
     try:
         import pigpio
@@ -103,7 +110,8 @@ def init() -> None:
         pi = pigpio.pi()
         if not pi.connected:
             log.warning("pigpio daemon not running — start with: sudo pigpiod")
-            return
+            _ready = False
+            return False
 
         pi.set_mode(config.PAN_SERVO_GPIO, pigpio.OUTPUT)
         pi.set_mode(config.TILT_SERVO_GPIO, pigpio.OUTPUT)
@@ -117,14 +125,25 @@ def init() -> None:
             config.TILT_SERVO_GPIO,
             config.LAUNCH_SERVO_GPIO,
         )
+        return True
     except ImportError:
         log.warning("pigpio not installed — servos disabled")
     except Exception as exc:
         log.warning("Servo init failed: %s", exc)
 
+    _ready = False
+    return False
+
+
+def ensure_ready() -> bool:
+    """Connect to pigpiod; retry if the daemon came up after server start."""
+    if _ready:
+        return True
+    return init()
+
 
 def set_pan_deg(pan_deg: int) -> None:
-    if not _ready or _pi is None:
+    if not ensure_ready() or _pi is None:
         return
 
     servo_angle = pan_deg_to_servo_angle(pan_deg)
@@ -134,7 +153,7 @@ def set_pan_deg(pan_deg: int) -> None:
 
 
 def set_tilt_deg(tilt_deg: int) -> None:
-    if not _ready or _pi is None:
+    if not ensure_ready() or _pi is None:
         return
 
     servo_angle = tilt_deg_to_servo_angle(tilt_deg)
@@ -151,7 +170,7 @@ def release_launch() -> None:
 
 
 def set_launch_deg(angle_deg: int, *, hold: bool = False) -> None:
-    if not _ready or _pi is None:
+    if not ensure_ready() or _pi is None:
         return
 
     angle_deg = max(0, min(180, angle_deg))

@@ -7,6 +7,7 @@
 #   sudo bash wifi.sh status      # What is running
 #   sudo bash wifi.sh sync        # Copy project -> /opt/launcher
 #   sudo bash wifi.sh servos-off  # Force PWM off immediately
+#   sudo bash wifi.sh hud-on      # Start pigpiod + launcher only (no WiFi AP)
 #
 # Typical use:
 #   Demo day:     sudo bash wifi.sh on
@@ -205,6 +206,12 @@ case "$CMD" in
   servos-off|stop-servos)
     stop_servos_now
     ;;
+  hud-on|servos-on)
+    sync_to_opt
+    ensure_venv
+    ensure_launcher_service
+    bash "${ROOT}/setup/start_servos.sh"
+    ;;
   status)
     stack_status
     ;;
@@ -214,6 +221,7 @@ case "$CMD" in
     echo "  sudo bash wifi.sh on --boot    # Launcher AP now + every reboot"
     echo "  sudo bash wifi.sh off          # Stop AP, use personal hotspot"
     echo "  sudo bash wifi.sh servos-off   # Force servos off now"
+    echo "  sudo bash wifi.sh hud-on       # Servos + HUD only (skip WiFi AP)"
     echo "  sudo bash wifi.sh status"
     echo "  sudo bash wifi.sh sync"
     exit 1

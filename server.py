@@ -53,6 +53,10 @@ def _clamp_pan_tilt() -> None:
 def _apply_move(move: str) -> None:
     global _pan_deg, _tilt_deg
 
+    if not servos.ensure_ready():
+        log.warning("Servo move ignored — pigpio not ready (run: sudo bash setup/start_servos.sh)")
+        return
+
     if move == "up":
         _tilt_deg -= config.MOVE_STEP_DEG
     elif move == "down":
@@ -126,6 +130,7 @@ def api_status():
         payload["battery_voltage_mv"] = None
 
     payload.update(launch_controller.status_dict())
+    payload["servos_ready"] = servos.is_ready()
     return jsonify(payload)
 
 
@@ -176,7 +181,13 @@ def main() -> None:
         log.info("Intro video: %s", intro)
 
     battery_monitor.init()
-    servos.init()
+    for attempt in range(1, 6):
+        if servos.init():
+            break
+        log.warning("Servo init attempt %d/5 failed — retrying in 1s", attempt)
+        import time
+
+        time.sleep(1)
     atexit.register(_shutdown)
 
     log.info("Launcher HUD on http://192.168.4.1:%d", config.WEB_PORT)
