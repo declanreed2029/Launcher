@@ -169,14 +169,30 @@ def release_launch() -> None:
         _pi.set_servo_pulsewidth(config.LAUNCH_SERVO_GPIO, 0)
 
 
+def launch_deg_to_servo_angle(angle_deg: int) -> int:
+    """Map launch angle to servo travel; invert flips rotation direction."""
+    angle_deg = max(0, min(180, angle_deg))
+    if config.LAUNCH_INVERT:
+        angle_deg = 180 - angle_deg
+    return angle_deg
+
+
 def set_launch_deg(angle_deg: int, *, hold: bool = False) -> None:
     if not ensure_ready() or _pi is None:
         return
 
     angle_deg = max(0, min(180, angle_deg))
-    pulse_us = angle_to_pulse_us(angle_deg)
+    servo_angle = launch_deg_to_servo_angle(angle_deg)
+    pulse_us = angle_to_pulse_us(servo_angle)
     _drive(config.LAUNCH_SERVO_GPIO, pulse_us, hold=hold)
-    log.info("launch servo -> %d deg (%d us, hold=%s)", angle_deg, pulse_us, hold)
+    log.info(
+        "launch servo -> %d deg (servo %d deg, %d us, hold=%s, invert=%s)",
+        angle_deg,
+        servo_angle,
+        pulse_us,
+        hold,
+        config.LAUNCH_INVERT,
+    )
 
 
 def run_launch_sequence() -> None:
