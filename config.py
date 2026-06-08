@@ -23,7 +23,7 @@ LAUNCH_HOLD_SEC = 0.5
 LAUNCH_COOLDOWN_SEC = 30
 LAUNCH_REST_DEG = 0
 LAUNCH_FIRE_DEG = 92
-# True = reverse launch rotation (CW ↔ CCW) without rewiring
+# True = fire ±LAUNCH_FIRE_DEG from rest the other way (rest servo at FIRE_DEG, fire at 0).
 LAUNCH_INVERT = True
 
 SERVO_MIN_PULSE_US = 500
@@ -38,6 +38,10 @@ PAN_MAX_DEG = 180
 TILT_MIN_DEG = 0
 TILT_MAX_DEG = 180
 MOVE_STEP_DEG = 5
+
+# If servos stop after a few moves, pigpiod may have died from brownout — auto-restart it
+PIGPIO_AUTO_RESTART = True
+PIGPIO_RESTART_COOLDOWN_SEC = 5
 
 # Battery monitor
 # Options: "mcp3008", "ina219", "none"

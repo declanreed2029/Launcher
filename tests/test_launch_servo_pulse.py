@@ -20,11 +20,16 @@ class TestLaunchServoPulse(unittest.TestCase):
         self.assertEqual(servos.angle_to_pulse_us(0), config.SERVO_MIN_PULSE_US)
         self.assertGreater(servos.angle_to_pulse_us(0), 0)
 
-    def test_launch_invert_flips_angle(self) -> None:
-        with patch.object(config, "LAUNCH_INVERT", True):
-            self.assertEqual(servos.launch_deg_to_servo_angle(0), 180)
-            self.assertEqual(servos.launch_deg_to_servo_angle(92), 88)
-        with patch.object(config, "LAUNCH_INVERT", False):
+    def test_launch_invert_symmetric_strokes(self) -> None:
+        with patch.object(config, "LAUNCH_REST_DEG", 0), patch.object(
+            config, "LAUNCH_FIRE_DEG", 92
+        ), patch.object(config, "LAUNCH_INVERT", True):
+            self.assertEqual(servos.launch_deg_to_servo_angle(0), 92)
+            self.assertEqual(servos.launch_deg_to_servo_angle(92), 0)
+        with patch.object(config, "LAUNCH_REST_DEG", 0), patch.object(
+            config, "LAUNCH_FIRE_DEG", 92
+        ), patch.object(config, "LAUNCH_INVERT", False):
+            self.assertEqual(servos.launch_deg_to_servo_angle(0), 0)
             self.assertEqual(servos.launch_deg_to_servo_angle(92), 92)
 
 

@@ -188,6 +188,14 @@ stack_status() {
     echo "servos:   offline (start with: sudo bash wifi.sh on)"
   fi
   ip -4 addr show wlan0 2>/dev/null | grep -oP 'inet \K[0-9.]+' | head -1 | xargs -I{} echo "wlan0 IP: {}" || true
+  if dmesg 2>/dev/null | grep -qiE 'under-voltage|Undervoltage detected'; then
+    echo "power:    UNDER-VOLTAGE events in kernel log — use a stronger 5V supply"
+    echo "          dmesg | grep -i voltage"
+  fi
+  restarts="$(curl -sf http://127.0.0.1/api/status 2>/dev/null | grep -oP '"pigpiod_restarts":\s*\K[0-9]+' || true)"
+  if [[ -n "${restarts}" ]] && [[ "${restarts}" -gt 0 ]]; then
+    echo "pigpiod:  auto-restarted ${restarts} time(s) this session (possible brownouts)"
+  fi
 }
 
 case "$CMD" in

@@ -32,28 +32,10 @@ install_pigpio() {
   rm -rf "$build_dir"
   ldconfig
 
-  if [[ ! -f /etc/systemd/system/pigpiod.service ]]; then
-    cat > /etc/systemd/system/pigpiod.service <<'EOF'
-[Unit]
-Description=pigpio daemon
-After=network.target
-
-[Service]
-Type=forking
-ExecStart=/usr/local/bin/pigpiod
-ExecStop=/bin/kill -s TERM $MAINPID
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-  fi
 }
 
 install_pigpio
-systemctl daemon-reload
-systemctl enable pigpiod
-systemctl start pigpiod
+bash "${SCRIPT_DIR}/ensure_pigpiod.sh"
 
 echo "Copying project to ${INSTALL_DIR}..."
 mkdir -p "$INSTALL_DIR"

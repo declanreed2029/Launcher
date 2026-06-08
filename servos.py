@@ -7,6 +7,8 @@ quiet at rest. Launch hold uses sustained PWM for LAUNCH_HOLD_SEC.
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
 import threading
 import time
 
@@ -18,6 +20,8 @@ _pi = None
 _ready = False
 _release_timers: dict[int, threading.Timer] = {}
 _timer_lock = threading.Lock()
+_last_pigpiod_restart = 0.0
+_pigpiod_restart_count = 0
 
 
 def pan_deg_to_servo_angle(pan_deg: int) -> int:
@@ -71,7 +75,7 @@ def _schedule_release(gpio: int) -> None:
 
 
 def _drive(gpio: int, pulse_us: int, *, hold: bool) -> None:
-    if not _ready or _pi is None:
+    if not ensure_ready() or _pi is None:
         return
 
     _cancel_release(gpio)
@@ -97,14 +101,51 @@ def release_all() -> None:
 
 
 def is_ready() -> bool:
-    return _ready
+    return _ready and _pi is not None and _pi.connected
+
+
+def pigpiod_restart_count() -> int:
+    return _pigpiod_restart_count
+
+
+def _try_restart_pigpiod() -> None:
+    """Restart pigpiod after brownout or daemon crash (launcher runs as root)."""
+    global _pigpiod_restart_count
+
+    pigpiod_path = None
+    for candidate in ("/usr/bin/pigpiod", "/usr/local/bin/pigpiod"):
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            pigpiod_path = candidate
+            break
+
+    try:
+        subprocess.run(
+            ["systemctl", "restart", "pigpiod"],
+            timeout=15,
+            check=False,
+            capture_output=True,
+        )
+        time.sleep(0.75)
+        _pigpiod_restart_count += 1
+        log.warning("Restarted pigpiod via systemctl (count=%d)", _pigpiod_restart_count)
+        return
+    except Exception as exc:
+        log.debug("systemctl restart pigpiod failed: %s", exc)
+
+    if pigpiod_path:
+        try:
+            subprocess.run(["pkill", "-x", "pigpiod"], timeout=5, check=False)
+            time.sleep(0.25)
+            subprocess.Popen([pigpiod_path])
+            time.sleep(0.75)
+            _pigpiod_restart_count += 1
+            log.warning("Restarted pigpiod directly (count=%d)", _pigpiod_restart_count)
+        except Exception as exc:
+            log.warning("Direct pigpiod restart failed: %s", exc)
 
 
 def init() -> bool:
     global _pi, _ready
-
-    if _ready and _pi is not None:
-        return True
 
     try:
         import pigpio
@@ -138,9 +179,36 @@ def init() -> bool:
 
 
 def ensure_ready() -> bool:
-    """Connect to pigpiod; retry if the daemon came up after server start."""
-    if _ready:
+    """Connect to pigpiod; restart daemon if brownout killed it."""
+    global _pi, _ready, _last_pigpiod_restart
+
+    if _pi is not None and _pi.connected:
         return True
+
+    _ready = False
+    if _pi is not None:
+        try:
+            _pi.stop()
+        except Exception:
+            pass
+        _pi = None
+
+    if init():
+        return True
+
+    if not config.PIGPIO_AUTO_RESTART:
+        return False
+
+    now = time.monotonic()
+    if now - _last_pigpiod_restart < config.PIGPIO_RESTART_COOLDOWN_SEC:
+        return False
+
+    _last_pigpiod_restart = now
+    log.warning(
+        "pigpio not connected — retrying after pigpiod restart "
+        "(often caused by undervoltage / 1A supply)"
+    )
+    _try_restart_pigpiod()
     return init()
 
 
@@ -184,11 +252,25 @@ def release_launch() -> None:
 
 
 def launch_deg_to_servo_angle(angle_deg: int) -> int:
-    """Map launch angle to servo travel; invert flips rotation direction."""
+    """Map HUD launch angle to servo travel.
+
+    Rest always returns to the same CW base. Invert flips fire to the opposite
+    ±LAUNCH_FIRE_DEG stroke (e.g. rest 92° / fire 0° vs rest 0° / fire 92°),
+    never rest at 180° which caused ~184° rotation one way.
+    """
     angle_deg = max(0, min(180, angle_deg))
+    hud_rest = max(0, min(180, config.LAUNCH_REST_DEG))
+    travel = max(0, min(180, config.LAUNCH_FIRE_DEG))
+
+    if angle_deg <= hud_rest:
+        if config.LAUNCH_INVERT:
+            return travel
+        return hud_rest
+
+    move = min(angle_deg - hud_rest, travel)
     if config.LAUNCH_INVERT:
-        angle_deg = 180 - angle_deg
-    return angle_deg
+        return max(0, min(180, travel - move))
+    return max(0, min(180, hud_rest + move))
 
 
 def set_launch_deg(angle_deg: int, *, hold: bool = False) -> None:

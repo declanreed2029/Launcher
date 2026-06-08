@@ -72,8 +72,13 @@ def _apply_move(move: str) -> None:
         return
 
     _clamp_pan_tilt()
-    servos.set_pan_deg(_pan_deg)
-    servos.set_tilt_deg(_tilt_deg)
+    if move in ("up", "down"):
+        servos.set_tilt_deg(_tilt_deg)
+    elif move in ("left", "right"):
+        servos.set_pan_deg(_pan_deg)
+    else:
+        servos.set_pan_deg(_pan_deg)
+        servos.set_tilt_deg(_tilt_deg)
 
 
 @app.get("/")
@@ -131,6 +136,7 @@ def api_status():
 
     payload.update(launch_controller.status_dict())
     payload["servos_ready"] = servos.is_ready()
+    payload["pigpiod_restarts"] = servos.pigpiod_restart_count()
     return jsonify(payload)
 
 
