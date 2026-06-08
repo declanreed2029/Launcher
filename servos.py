@@ -20,8 +20,10 @@ _pi = None
 _ready = False
 _release_timers: dict[int, threading.Timer] = {}
 _timer_lock = threading.Lock()
+_pi_lock = threading.Lock()
 _last_pigpiod_restart = 0.0
 _pigpiod_restart_count = 0
+_last_drive_error: str | None = None
 
 
 def pan_deg_to_servo_angle(pan_deg: int) -> int:
@@ -60,8 +62,9 @@ def _schedule_release(gpio: int) -> None:
     delay_s = _release_ms_for_gpio(gpio) / 1000.0
 
     def _release() -> None:
-        if _pi is not None:
-            _pi.set_servo_pulsewidth(gpio, 0)
+        with _pi_lock:
+            if _pi is not None:
+                _pi.set_servo_pulsewidth(gpio, 0)
         with _timer_lock:
             _release_timers.pop(gpio, None)
 
@@ -74,30 +77,52 @@ def _schedule_release(gpio: int) -> None:
         _release_timers[gpio].start()
 
 
-def _drive(gpio: int, pulse_us: int, *, hold: bool) -> None:
+def _drive(gpio: int, pulse_us: int, *, hold: bool) -> bool:
     if not ensure_ready() or _pi is None:
-        return
+        _set_drive_error("pigpio not ready")
+        log.warning("GPIO%d drive skipped — pigpio not ready", gpio)
+        return False
 
-    _cancel_release(gpio)
-    if pulse_us <= 0:
-        _pi.set_servo_pulsewidth(gpio, 0)
-        return
+    with _pi_lock:
+        if not _ensure_gpio_output(gpio):
+            return False
 
-    _pi.set_servo_pulsewidth(gpio, pulse_us)
+        with _timer_lock:
+            timer = _release_timers.pop(gpio, None)
+        if timer is not None:
+            timer.cancel()
+
+        if pulse_us <= 0:
+            _pigpio_ok(_pi.set_servo_pulsewidth(gpio, 0), gpio, "PWM off")
+            return True
+
+        if not _pigpio_ok(
+            _pi.set_servo_pulsewidth(gpio, pulse_us), gpio, f"pulse {pulse_us}us"
+        ):
+            return False
+
+        _set_drive_error(None)
+
     if not hold:
         _schedule_release(gpio)
+    return True
 
 
 def release_all() -> None:
     """Stop PWM on all servo pins (quiet idle, no buzz)."""
-    for gpio in (
-        config.PAN_SERVO_GPIO,
-        config.TILT_SERVO_GPIO,
-        config.LAUNCH_SERVO_GPIO,
-    ):
-        _cancel_release(gpio)
-        if _pi is not None:
-            _pi.set_servo_pulsewidth(gpio, 0)
+    with _pi_lock:
+        for gpio in (
+            config.PAN_SERVO_GPIO,
+            config.TILT_SERVO_GPIO,
+            config.LAUNCH_SERVO_GPIO,
+        ):
+            with _timer_lock:
+                timer = _release_timers.pop(gpio, None)
+            if timer is not None:
+                timer.cancel()
+            if _pi is not None:
+                _ensure_gpio_output(gpio)
+                _pi.set_servo_pulsewidth(gpio, 0)
 
 
 def is_ready() -> bool:
@@ -106,6 +131,40 @@ def is_ready() -> bool:
 
 def pigpiod_restart_count() -> int:
     return _pigpiod_restart_count
+
+
+def last_drive_error() -> str | None:
+    return _last_drive_error
+
+
+def _set_drive_error(msg: str | None) -> None:
+    global _last_drive_error
+    _last_drive_error = msg
+
+
+def _ensure_gpio_output(gpio: int) -> bool:
+    """Pins can be left INPUT after stop_servos.sh — reassert OUTPUT before PWM."""
+    if _pi is None:
+        return False
+    try:
+        import pigpio
+
+        if _pi.get_mode(gpio) != pigpio.OUTPUT:
+            log.warning("GPIO%d was not OUTPUT — reconfiguring (common after stop_servos)", gpio)
+            _pi.set_mode(gpio, pigpio.OUTPUT)
+        return True
+    except Exception as exc:
+        _set_drive_error(f"GPIO{gpio} mode: {exc}")
+        log.warning("GPIO%d set_mode failed: %s", gpio, exc)
+        return False
+
+
+def _pigpio_ok(result: int, gpio: int, action: str) -> bool:
+    if result >= 0:
+        return True
+    _set_drive_error(f"GPIO{gpio} {action} failed (code {result})")
+    log.error("GPIO%d %s failed (pigpio code %d)", gpio, action, result)
+    return False
 
 
 def _try_restart_pigpiod() -> None:
@@ -233,22 +292,19 @@ def set_tilt_deg(tilt_deg: int) -> None:
 
 
 def _ensure_launch_output() -> None:
-    if _pi is not None:
-        import pigpio
-
-        _pi.set_mode(config.LAUNCH_SERVO_GPIO, pigpio.OUTPUT)
+    _ensure_gpio_output(config.LAUNCH_SERVO_GPIO)
 
 
 def release_launch() -> None:
-    """Stop PWM on launch pin and float the line to avoid post-move jitter."""
-    _cancel_release(config.LAUNCH_SERVO_GPIO)
-    if _pi is not None:
-        import pigpio
-
-        _pi.set_servo_pulsewidth(config.LAUNCH_SERVO_GPIO, 0)
-        time.sleep(0.05)
-        _pi.set_mode(config.LAUNCH_SERVO_GPIO, pigpio.INPUT)
-        _pi.set_pull_up_down(config.LAUNCH_SERVO_GPIO, pigpio.PUD_OFF)
+    """Stop PWM on launch pin (keep OUTPUT so the next fire can drive immediately)."""
+    with _timer_lock:
+        timer = _release_timers.pop(config.LAUNCH_SERVO_GPIO, None)
+    if timer is not None:
+        timer.cancel()
+    with _pi_lock:
+        if _pi is not None:
+            _ensure_gpio_output(config.LAUNCH_SERVO_GPIO)
+            _pi.set_servo_pulsewidth(config.LAUNCH_SERVO_GPIO, 0)
 
 
 def launch_deg_to_servo_angle(angle_deg: int) -> int:
@@ -293,11 +349,26 @@ def set_launch_deg(angle_deg: int, *, hold: bool = False) -> None:
 
 
 def run_launch_sequence() -> None:
-    """Fire (held), return to rest with one timed pulse, then float the pin."""
+    """Fire (held), return to rest with one timed pulse, then stop PWM."""
+    if not ensure_ready():
+        log.error("Launch sequence aborted — pigpio not ready")
+        return
+
     _ensure_launch_output()
-    set_launch_deg(config.LAUNCH_FIRE_DEG, hold=True)
+    if not _drive(config.LAUNCH_SERVO_GPIO, angle_to_pulse_us(
+        launch_deg_to_servo_angle(config.LAUNCH_FIRE_DEG)
+    ), hold=True):
+        log.error("Launch fire pulse failed")
+        return
+
     time.sleep(config.LAUNCH_HOLD_SEC)
-    set_launch_deg(config.LAUNCH_REST_DEG, hold=False)
+
+    if not _drive(config.LAUNCH_SERVO_GPIO, angle_to_pulse_us(
+        launch_deg_to_servo_angle(config.LAUNCH_REST_DEG)
+    ), hold=False):
+        log.error("Launch return pulse failed")
+        return
+
     time.sleep(config.LAUNCH_RETURN_MS / 1000.0 + 0.15)
     release_launch()
 

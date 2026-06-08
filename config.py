@@ -22,7 +22,7 @@ LAUNCH_COUNTDOWN_SEC = 3
 LAUNCH_HOLD_SEC = 0.5
 LAUNCH_COOLDOWN_SEC = 30
 LAUNCH_REST_DEG = 0
-LAUNCH_FIRE_DEG = 92
+LAUNCH_FIRE_DEG = 88
 # True = fire ±LAUNCH_FIRE_DEG from rest the other way (rest servo at FIRE_DEG, fire at 0).
 LAUNCH_INVERT = True
 
@@ -30,7 +30,7 @@ SERVO_MIN_PULSE_US = 500
 SERVO_MAX_PULSE_US = 2500
 # Stop PWM after each move so servos do not buzz/hunt while idle (ms)
 SERVO_RELEASE_MS = 400
-SERVO_TILT_RELEASE_MS = 1200  # tilt often needs longer drive than pan
+SERVO_TILT_RELEASE_MS = 2000  # tilt often needs longer drive than pan (25 kg load)
 LAUNCH_RETURN_MS = 1500  # ms to drive to rest before PWM off (no sustained hold)
 
 PAN_MIN_DEG = -180

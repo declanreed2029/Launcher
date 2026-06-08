@@ -137,6 +137,7 @@ def api_status():
     payload.update(launch_controller.status_dict())
     payload["servos_ready"] = servos.is_ready()
     payload["pigpiod_restarts"] = servos.pigpiod_restart_count()
+    payload["servo_error"] = servos.last_drive_error()
     return jsonify(payload)
 
 

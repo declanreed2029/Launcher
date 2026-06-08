@@ -74,22 +74,24 @@ class TestServerMoves(unittest.TestCase):
         mock_pan.assert_called_once_with(5)
         mock_tilt.assert_called_once_with(90)
 
+    @patch.object(servos, "ensure_ready", return_value=True)
     @patch.object(servos, "set_pan_deg")
     @patch.object(servos, "set_tilt_deg")
-    def test_up_updates_tilt_only(self, mock_tilt, mock_pan) -> None:
+    def test_up_updates_tilt_only(self, mock_tilt, mock_pan, _mock_ready) -> None:
         self.server._apply_move("up")
         self.assertEqual(self.server._tilt_deg, 85)
         self.assertEqual(self.server._pan_deg, 0)
         mock_tilt.assert_called_once_with(85)
-        mock_pan.assert_called_once_with(0)
+        mock_pan.assert_not_called()
 
+    @patch.object(servos, "ensure_ready", return_value=True)
     @patch.object(servos, "set_pan_deg")
     @patch.object(servos, "set_tilt_deg")
-    def test_down_updates_tilt_only(self, mock_tilt, mock_pan) -> None:
+    def test_down_updates_tilt_only(self, mock_tilt, mock_pan, _mock_ready) -> None:
         self.server._apply_move("down")
         self.assertEqual(self.server._tilt_deg, 95)
         mock_tilt.assert_called_once_with(95)
-        mock_pan.assert_called_once_with(0)
+        mock_pan.assert_not_called()
 
     @patch.object(servos, "set_pan_deg")
     @patch.object(servos, "set_tilt_deg")
